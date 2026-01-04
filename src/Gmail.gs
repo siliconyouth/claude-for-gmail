@@ -80,3 +80,105 @@ function getEmailMetadata(message) {
     threadId: message.getThread().getId()
   };
 }
+
+// ============================================================================
+// THREAD CONTEXT
+// ============================================================================
+
+/**
+ * Get the full thread context for a message
+ * @param {GmailMessage} message - The Gmail message
+ * @param {number} maxMessages - Maximum messages to include (default: 5)
+ * @returns {Object} Thread context with messages and metadata
+ */
+function getThreadContext(message, maxMessages) {
+  maxMessages = maxMessages || 5;
+
+  const thread = message.getThread();
+  const allMessages = thread.getMessages();
+  const currentMessageId = message.getId();
+
+  // Get messages up to the current one (not including future messages)
+  const relevantMessages = [];
+  for (let i = 0; i < allMessages.length; i++) {
+    relevantMessages.push(allMessages[i]);
+    if (allMessages[i].getId() === currentMessageId) {
+      break;
+    }
+  }
+
+  // Take the last N messages
+  const messagesToInclude = relevantMessages.slice(-maxMessages);
+
+  // Build context
+  const context = {
+    threadSubject: thread.getFirstMessageSubject(),
+    totalMessages: allMessages.length,
+    includedMessages: messagesToInclude.length,
+    messages: []
+  };
+
+  messagesToInclude.forEach(function(msg, index) {
+    const isCurrentMessage = msg.getId() === currentMessageId;
+
+    context.messages.push({
+      index: index + 1,
+      from: msg.getFrom(),
+      date: msg.getDate(),
+      isCurrent: isCurrentMessage,
+      body: getEmailBody(msg)
+    });
+  });
+
+  return context;
+}
+
+/**
+ * Format thread context for Claude prompt
+ * @param {Object} threadContext - Thread context object
+ * @returns {string} Formatted context string
+ */
+function formatThreadContextForPrompt(threadContext) {
+  if (threadContext.messages.length <= 1) {
+    return ''; // No thread context needed for single message
+  }
+
+  let contextStr = `\n\n--- THREAD CONTEXT (${threadContext.includedMessages} of ${threadContext.totalMessages} messages) ---\n`;
+  contextStr += `Subject: ${threadContext.threadSubject}\n\n`;
+
+  threadContext.messages.forEach(function(msg) {
+    const marker = msg.isCurrent ? '[CURRENT MESSAGE]' : `[Message ${msg.index}]`;
+    const dateStr = Utilities.formatDate(msg.date, Session.getScriptTimeZone(), 'MMM d, h:mm a');
+
+    contextStr += `${marker}\n`;
+    contextStr += `From: ${msg.from}\n`;
+    contextStr += `Date: ${dateStr}\n`;
+    contextStr += `${msg.body}\n`;
+    contextStr += '\n---\n\n';
+  });
+
+  return contextStr;
+}
+
+/**
+ * Get email body with thread context included
+ * @param {GmailMessage} message - The Gmail message
+ * @param {boolean} includeContext - Whether to include thread context
+ * @returns {string} Email body with optional context
+ */
+function getEmailBodyWithContext(message, includeContext) {
+  const body = getEmailBody(message);
+
+  if (!includeContext) {
+    return body;
+  }
+
+  const threadContext = getThreadContext(message);
+
+  // Only include context if there's a thread
+  if (threadContext.totalMessages > 1) {
+    return formatThreadContextForPrompt(threadContext) + '\n\n--- CURRENT EMAIL ---\n' + body;
+  }
+
+  return body;
+}

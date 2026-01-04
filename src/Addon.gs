@@ -117,8 +117,60 @@ function buildHomepageCard() {
     );
   }
 
+  // Automation section
+  const automationSection = CardService.newCardSection()
+    .setHeader('Automation');
+
+  // Daily digest toggle
+  const digestAction = CardService.newAction()
+    .setFunctionName('onToggleDigest');
+
+  automationSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Daily Digest')
+      .setBottomLabel('Morning summary at 8 AM')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.EMAIL))
+      .setSwitchControl(
+        CardService.newSwitch()
+          .setFieldName('digestEnabled')
+          .setValue('true')
+          .setOnChangeAction(digestAction)
+          .setSelected(isDigestEnabled())
+      )
+  );
+
+  // Auto-label toggle
+  const autoLabelAction = CardService.newAction()
+    .setFunctionName('onToggleAutoLabel');
+
+  automationSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Auto-Label Emails')
+      .setBottomLabel('Smart categorization every 30 min')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+      .setSwitchControl(
+        CardService.newSwitch()
+          .setFieldName('autoLabelEnabled')
+          .setValue('true')
+          .setOnChangeAction(autoLabelAction)
+          .setSelected(isAutoLabelEnabled())
+      )
+  );
+
+  // Send digest now button
+  const sendDigestAction = CardService.newAction()
+    .setFunctionName('onSendDigestNow');
+
+  automationSection.addWidget(
+    CardService.newTextButton()
+      .setText('📧 Send Digest Now')
+      .setOnClickAction(sendDigestAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+  );
+
   card.addSection(welcomeSection);
   card.addSection(featuresSection);
+  card.addSection(automationSection);
   card.addSection(statusSection);
 
   return card.build();
@@ -191,6 +243,35 @@ function buildEmailActionCard(messageId) {
   );
 
   card.addSection(actionsSection);
+
+  // Templates section
+  const templatesSection = CardService.newCardSection()
+    .setHeader('Quick Templates');
+
+  const templateAction = CardService.newAction()
+    .setFunctionName('onShowTemplates')
+    .setParameters({ messageId: messageId });
+
+  templatesSection.addWidget(
+    CardService.newTextButton()
+      .setText('📋 Use Template')
+      .setOnClickAction(templateAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+  );
+
+  // Smart label button
+  const labelAction = CardService.newAction()
+    .setFunctionName('onApplySmartLabels')
+    .setParameters({ messageId: messageId });
+
+  templatesSection.addWidget(
+    CardService.newTextButton()
+      .setText('🏷️ Apply Smart Labels')
+      .setOnClickAction(labelAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+  );
+
+  card.addSection(templatesSection);
 
   return card.build();
 }
@@ -786,5 +867,214 @@ function getSentimentIcon(sentiment) {
       return CardService.Icon.DESCRIPTION;
     default:
       return CardService.Icon.DESCRIPTION;
+  }
+}
+
+// ============================================================================
+// AUTOMATION HANDLERS
+// ============================================================================
+
+/**
+ * Check if digest trigger is enabled
+ * @returns {boolean}
+ */
+function isDigestEnabled() {
+  const triggers = ScriptApp.getProjectTriggers();
+  return triggers.some(t => t.getHandlerFunction() === 'sendDailyDigest');
+}
+
+/**
+ * Check if auto-label trigger is enabled
+ * @returns {boolean}
+ */
+function isAutoLabelEnabled() {
+  const triggers = ScriptApp.getProjectTriggers();
+  return triggers.some(t => t.getHandlerFunction() === 'autoLabelUnreadEmails');
+}
+
+/**
+ * Toggle daily digest
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onToggleDigest(e) {
+  const enabled = e.formInputs?.digestEnabled?.[0] === 'true';
+
+  if (enabled) {
+    setupDigestTrigger();
+  } else {
+    removeDigestTrigger();
+  }
+
+  return CardService.newActionResponseBuilder()
+    .setNotification(
+      CardService.newNotification()
+        .setText(enabled ? 'Daily digest enabled' : 'Daily digest disabled')
+    )
+    .build();
+}
+
+/**
+ * Toggle auto-labeling
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onToggleAutoLabel(e) {
+  const enabled = e.formInputs?.autoLabelEnabled?.[0] === 'true';
+
+  if (enabled) {
+    initializeLabels();
+    setupAutoLabelTrigger();
+  } else {
+    removeAutoLabelTrigger();
+  }
+
+  return CardService.newActionResponseBuilder()
+    .setNotification(
+      CardService.newNotification()
+        .setText(enabled ? 'Auto-labeling enabled' : 'Auto-labeling disabled')
+    )
+    .build();
+}
+
+/**
+ * Send digest immediately
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onSendDigestNow(e) {
+  try {
+    sendDailyDigest();
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText('Digest sent! Check your inbox.')
+      )
+      .build();
+  } catch (error) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText('Error: ' + error.message)
+      )
+      .build();
+  }
+}
+
+// ============================================================================
+// TEMPLATE HANDLERS
+// ============================================================================
+
+/**
+ * Show template selection card
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onShowTemplates(e) {
+  const messageId = e.parameters.messageId;
+  const card = buildTemplateSelectionCard(messageId);
+
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().pushCard(card))
+    .build();
+}
+
+/**
+ * Build template selection card
+ * @param {string} messageId - Message ID
+ * @returns {Card}
+ */
+function buildTemplateSelectionCard(messageId) {
+  const card = CardService.newCardBuilder();
+
+  card.setHeader(
+    CardService.newCardHeader()
+      .setTitle('Select Template')
+      .setSubtitle('Choose a reply template')
+  );
+
+  const templates = getTemplates();
+  const section = CardService.newCardSection();
+
+  templates.forEach(function(template) {
+    const action = CardService.newAction()
+      .setFunctionName('onApplyTemplate')
+      .setParameters({ messageId: messageId, templateId: template.id });
+
+    section.addWidget(
+      CardService.newDecoratedText()
+        .setText(template.name)
+        .setBottomLabel(template.description)
+        .setOnClickAction(action)
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.DESCRIPTION))
+    );
+  });
+
+  card.addSection(section);
+
+  return card.build();
+}
+
+/**
+ * Apply a template to create a draft
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onApplyTemplate(e) {
+  const messageId = e.parameters.messageId;
+  const templateId = e.parameters.templateId;
+
+  try {
+    const result = applyTemplateToEmail(messageId, templateId, '');
+    const card = buildDraftResultCard(result.content, result.draftId, messageId);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    Logger.log('Template error: ' + error.message);
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText('Error: ' + error.message)
+      )
+      .build();
+  }
+}
+
+// ============================================================================
+// SMART LABEL HANDLERS
+// ============================================================================
+
+/**
+ * Apply smart labels to current email
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onApplySmartLabels(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const message = GmailApp.getMessageById(messageId);
+    const result = applySmartLabels(message, true);
+
+    const labelsApplied = result.labels.map(l => l.split('/').pop()).join(', ');
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText(`Labels applied: ${labelsApplied}`)
+      )
+      .build();
+
+  } catch (error) {
+    Logger.log('Label error: ' + error.message);
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText('Error: ' + error.message)
+      )
+      .build();
   }
 }
