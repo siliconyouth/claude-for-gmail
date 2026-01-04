@@ -32,20 +32,21 @@ clasp run <functionName>
 
 ```
 ├── src/
-│   ├── Code.gs          # Main entry point and Gmail triggers
-│   ├── Claude.gs        # Claude API integration
-│   ├── Gmail.gs         # Gmail-specific utilities
-│   └── Config.gs        # Configuration and constants
-├── appsscript.json      # Apps Script manifest
-├── .clasp.json          # clasp configuration (local only)
+│   ├── Code.gs          # Main entry point, triggers, and menu handlers
+│   ├── Claude.gs        # Claude API integration (askClaude, summarize, analyze)
+│   ├── Gmail.gs         # Gmail utilities (get emails, create drafts, labels)
+│   └── Config.gs        # Configuration, API key management, preferences
+├── appsscript.json      # Apps Script manifest with OAuth scopes
+├── .clasp.json          # clasp configuration (local only, gitignored)
 └── .clasprc.json        # clasp credentials (local only, gitignored)
 ```
 
 ## Architecture
 
-- **Trigger-based execution**: Uses Gmail add-on triggers or time-based triggers to process emails
-- **Claude API calls**: Makes HTTP requests to Anthropic API via `UrlFetchApp`
-- **Script Properties**: Stores API keys and user preferences securely
+- **Trigger-based execution**: Time-driven triggers via `setupTrigger()` for automatic processing
+- **Claude API calls**: HTTP requests to Anthropic API via `UrlFetchApp` with proper headers
+- **Script Properties**: `PropertiesService.getScriptProperties()` for API key, `getUserProperties()` for preferences
+- **Modular design**: Separation of concerns between Claude integration, Gmail operations, and configuration
 
 ## Key Constraints
 
