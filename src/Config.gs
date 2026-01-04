@@ -29,9 +29,25 @@ function getApiKey() {
 
 /**
  * Set the Claude API key in script properties
- * @param {string} apiKey - Your Anthropic API key
+ * @param {string} apiKey - Your Anthropic API key (optional if using prompt)
  */
 function setApiKey(apiKey) {
+  // If no API key provided, prompt for it
+  if (!apiKey) {
+    const ui = SpreadsheetApp.getUi ? SpreadsheetApp.getUi() : null;
+    if (ui) {
+      const response = ui.prompt('Enter your Anthropic API key:');
+      if (response.getSelectedButton() === ui.Button.OK) {
+        apiKey = response.getResponseText();
+      } else {
+        Logger.log('API key setup cancelled');
+        return;
+      }
+    } else {
+      throw new Error('Please call setApiKey("your-api-key") with your key as argument');
+    }
+  }
+
   const props = PropertiesService.getScriptProperties();
   props.setProperty('CLAUDE_API_KEY', apiKey);
   Logger.log('API key saved successfully');
