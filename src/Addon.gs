@@ -338,12 +338,12 @@ function onAnalyzeEmail(e) {
   const messageId = e.parameters.messageId;
 
   try {
-    const message = GmailApp.getMessageById(messageId);
+    const message = validateAndGetMessage(messageId);
     const body = getEmailBody(message);
     const metadata = getEmailMetadata(message);
 
-    // Get summary
-    const summary = summarizeEmail(body);
+    // Get summary (with caching)
+    const summary = summarizeEmail(body, messageId);
 
     // Build result card
     const card = buildSummaryResultCard(metadata, summary, messageId);
@@ -353,8 +353,9 @@ function onAnalyzeEmail(e) {
       .build();
 
   } catch (error) {
-    Logger.log('Analysis error: ' + error.message);
-    const errorCard = buildErrorCard('Analysis Failed', error.message);
+    logError('onAnalyzeEmail', error);
+    const parsed = parseError(error);
+    const errorCard = buildErrorCard('Analysis Failed', parsed.message);
     return CardService.newActionResponseBuilder()
       .setNavigation(CardService.newNavigation().pushCard(errorCard))
       .build();
@@ -382,11 +383,11 @@ function onDraftReplyStart(e) {
  */
 function onGenerateDraft(e) {
   const messageId = e.parameters.messageId;
-  const tone = e.parameters.tone || 'professional';
+  const tone = e.formInput?.tone?.[0] || e.parameters.tone || 'professional';
   const customInstructions = e.formInput?.customInstructions || '';
 
   try {
-    const message = GmailApp.getMessageById(messageId);
+    const message = validateAndGetMessage(messageId);
     const body = getEmailBody(message);
 
     let instructions = `Tone: ${tone}`;
@@ -404,8 +405,9 @@ function onGenerateDraft(e) {
       .build();
 
   } catch (error) {
-    Logger.log('Draft error: ' + error.message);
-    const errorCard = buildErrorCard('Draft Failed', error.message);
+    logError('onGenerateDraft', error);
+    const parsed = parseError(error);
+    const errorCard = buildErrorCard('Draft Failed', parsed.message);
     return CardService.newActionResponseBuilder()
       .setNavigation(CardService.newNavigation().pushCard(errorCard))
       .build();
@@ -421,10 +423,11 @@ function onExtractActions(e) {
   const messageId = e.parameters.messageId;
 
   try {
-    const message = GmailApp.getMessageById(messageId);
+    const message = validateAndGetMessage(messageId);
     const body = getEmailBody(message);
 
-    const actionItems = extractActionItems(body);
+    // Extract with caching
+    const actionItems = extractActionItems(body, messageId);
     const card = buildActionItemsCard(actionItems, messageId);
 
     return CardService.newActionResponseBuilder()
@@ -432,8 +435,9 @@ function onExtractActions(e) {
       .build();
 
   } catch (error) {
-    Logger.log('Extract error: ' + error.message);
-    const errorCard = buildErrorCard('Extraction Failed', error.message);
+    logError('onExtractActions', error);
+    const parsed = parseError(error);
+    const errorCard = buildErrorCard('Extraction Failed', parsed.message);
     return CardService.newActionResponseBuilder()
       .setNavigation(CardService.newNavigation().pushCard(errorCard))
       .build();
@@ -442,6 +446,7 @@ function onExtractActions(e) {
 
 /**
  * Handle Full Analysis button (summary + analysis + action items)
+ * Uses single API call for efficiency
  * @param {Object} e - Event object
  * @returns {ActionResponse}
  */
@@ -449,24 +454,29 @@ function onFullAnalysis(e) {
   const messageId = e.parameters.messageId;
 
   try {
-    const message = GmailApp.getMessageById(messageId);
+    const message = validateAndGetMessage(messageId);
     const body = getEmailBody(message);
     const metadata = getEmailMetadata(message);
 
-    // Run all analyses
-    const summary = summarizeEmail(body);
-    const analysis = analyzeEmail(body);
-    const actionItems = extractActionItems(body);
+    // Single API call for all analyses (more efficient)
+    const fullResult = fullEmailAnalysis(body, messageId);
 
-    const card = buildFullAnalysisCard(metadata, summary, analysis, actionItems, messageId);
+    const card = buildFullAnalysisCard(
+      metadata,
+      fullResult.summary,
+      fullResult.analysis,
+      fullResult.actionItems,
+      messageId
+    );
 
     return CardService.newActionResponseBuilder()
       .setNavigation(CardService.newNavigation().pushCard(card))
       .build();
 
   } catch (error) {
-    Logger.log('Full analysis error: ' + error.message);
-    const errorCard = buildErrorCard('Analysis Failed', error.message);
+    logError('onFullAnalysis', error);
+    const parsed = parseError(error);
+    const errorCard = buildErrorCard('Analysis Failed', parsed.message);
     return CardService.newActionResponseBuilder()
       .setNavigation(CardService.newNavigation().pushCard(errorCard))
       .build();
