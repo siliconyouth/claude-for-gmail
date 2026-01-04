@@ -16,7 +16,6 @@
     "common": {
       "name": "Claude for Gmail",
       "logoUrl": "https://www.gstatic.com/images/branding/product/2x/google_cloud_48dp.png",
-      "useLocaleFromApp": true,
       "homepageTrigger": {
         "runFunction": "onHomepage",
         "enabled": true
