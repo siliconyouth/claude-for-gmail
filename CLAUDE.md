@@ -4,21 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Claude for Gmail is a Google Apps Script project that integrates Claude AI with Gmail for intelligent email assistance.
+Claude for Gmail is a Google Apps Script Gmail Add-on that integrates Claude AI for intelligent email assistance. It provides a sidebar UI within Gmail for summarizing emails, analyzing priority/sentiment, drafting replies, and extracting action items.
 
 ## Development Commands
 
 ```bash
 # Push local changes to Google Apps Script
-clasp push
+clasp push --force
 
 # Pull remote changes from Google Apps Script
 clasp pull
 
-# Open the Apps Script project in browser
-clasp open
-
-# Deploy a new version
+# Deploy a new version (for add-on publishing)
 clasp deploy
 
 # View logs
@@ -32,32 +29,62 @@ clasp run <functionName>
 
 ```
 ├── src/
-│   ├── Code.gs          # Main entry point, triggers, and menu handlers
-│   ├── Claude.gs        # Claude API integration (askClaude, summarize, analyze)
+│   ├── Code.gs          # Main entry point, triggers, menu handlers
+│   ├── Addon.gs         # Gmail Add-on UI (CardService cards and actions)
+│   ├── Claude.gs        # Claude API integration (askClaude, summarize, analyze, extractActionItems)
 │   ├── Gmail.gs         # Gmail utilities (get emails, create drafts, labels)
 │   └── Config.gs        # Configuration, API key management, preferences
-├── appsscript.json      # Apps Script manifest with OAuth scopes
+├── appsscript.json      # Apps Script manifest with add-on config and OAuth scopes
 ├── .clasp.json          # clasp configuration (local only, gitignored)
 └── .clasprc.json        # clasp credentials (local only, gitignored)
 ```
 
 ## Architecture
 
-- **Trigger-based execution**: Time-driven triggers via `setupTrigger()` for automatic processing
-- **Claude API calls**: HTTP requests to Anthropic API via `UrlFetchApp` with proper headers
-- **Script Properties**: `PropertiesService.getScriptProperties()` for API key, `getUserProperties()` for preferences
-- **Modular design**: Separation of concerns between Claude integration, Gmail operations, and configuration
+### Gmail Add-on UI (Addon.gs)
+- **CardService**: All UI built with Google's CardService API
+- **Trigger handlers**: `onHomepage()` for sidebar home, `onGmailMessage()` for email context
+- **Action handlers**: `onAnalyzeEmail()`, `onDraftReplyStart()`, `onExtractActions()`, `onFullAnalysis()`
+- **Navigation**: Cards pushed onto stack via `CardService.newNavigation().pushCard()`
+
+### Core Functions
+- **askClaude(prompt, systemPrompt)**: Base API call to Claude
+- **summarizeEmail(body)**: Returns concise summary
+- **analyzeEmail(body)**: Returns {sentiment, priority, category, summary}
+- **extractActionItems(body)**: Returns {tasks[], deadlines[], waitingOn[]}
+- **generateReply(body, instructions)**: Returns draft reply text
+
+### Data Flow
+```
+Gmail Message → getEmailBody() → Claude API → CardService UI
+                                           ↓
+                              createReplyDraft() → Gmail Drafts
+```
 
 ## Key Constraints
 
-- Apps Script has a 6-minute execution time limit per function
-- `UrlFetchApp` is the only way to make HTTP requests
-- No npm packages - all dependencies must be included directly or use Apps Script libraries
-- Use `PropertiesService.getScriptProperties()` for sensitive configuration
+- Apps Script 6-minute execution limit per function
+- `UrlFetchApp` is the only HTTP client
+- No npm packages - all code must be self-contained
+- CardService widgets have limited styling options
+- Add-on context (`e.gmail.messageId`) only available in contextual triggers
 
-## Testing
+## Add-on Deployment
 
-Apps Script doesn't have built-in testing. Test functions locally by:
-1. Creating test functions prefixed with `test_`
-2. Running via `clasp run test_<functionName>`
-3. Checking execution logs with `clasp logs`
+### Test Deployment (Head)
+1. Push code: `clasp push --force`
+2. In Apps Script editor: Deploy → Test deployments → Install
+3. Open Gmail and find "Claude for Gmail" in sidebar
+
+### Production Deployment
+1. Deploy → New deployment → Select type: Add-on
+2. Fill in metadata and submit for review (if publishing to Marketplace)
+
+## OAuth Scopes
+
+The add-on requires these scopes (defined in appsscript.json):
+- `gmail.readonly` - Read email content
+- `gmail.compose` - Create draft replies
+- `gmail.addons.execute` - Run as Gmail add-on
+- `gmail.addons.current.message.readonly` - Access current email
+- `script.external_request` - Call Claude API

@@ -109,3 +109,34 @@ Respond ONLY with valid JSON, no other text.`;
     };
   }
 }
+
+/**
+ * Extract action items, deadlines, and dependencies from an email
+ * @param {string} emailBody - The email content to analyze
+ * @returns {Object} Extracted items with tasks, deadlines, and waitingOn arrays
+ */
+function extractActionItems(emailBody) {
+  const systemPrompt = `You are an email analyst specializing in extracting actionable information.
+Extract and return JSON with:
+- tasks: array of action items/todos mentioned (things the recipient should do)
+- deadlines: array of dates or timeframes mentioned (e.g., "by Friday", "January 15th", "end of week")
+- waitingOn: array of things the sender is waiting for or dependencies on other people
+
+Be specific and actionable. If no items exist for a category, use an empty array.
+Respond ONLY with valid JSON, no other text.`;
+
+  const prompt = `Extract action items from this email:\n\n${emailBody}`;
+
+  const response = askClaude(prompt, systemPrompt);
+
+  try {
+    return JSON.parse(response);
+  } catch (e) {
+    Logger.log('Failed to parse action items response: ' + response);
+    return {
+      tasks: [],
+      deadlines: [],
+      waitingOn: []
+    };
+  }
+}

@@ -6,7 +6,38 @@
   "oauthScopes": [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
+    "https://www.googleapis.com/auth/gmail.addons.current.action.compose",
     "https://www.googleapis.com/auth/script.external_request",
     "https://www.googleapis.com/auth/script.scriptapp"
-  ]
+  ],
+  "addOns": {
+    "common": {
+      "name": "Claude for Gmail",
+      "logoUrl": "https://www.gstatic.com/images/branding/product/2x/google_cloud_48dp.png",
+      "useLocaleFromApp": true,
+      "homepageTrigger": {
+        "runFunction": "onHomepage",
+        "enabled": true
+      }
+    },
+    "gmail": {
+      "contextualTriggers": [
+        {
+          "unconditional": {},
+          "onTriggerFunction": "onGmailMessage"
+        }
+      ],
+      "composeTrigger": {
+        "selectActions": [
+          {
+            "text": "Draft with Claude",
+            "runFunction": "onCompose"
+          }
+        ],
+        "draftAccess": "NONE"
+      }
+    }
+  }
 }
