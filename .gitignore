@@ -1,0 +1,22 @@
+# clasp credentials (contains OAuth tokens)
+.clasprc.json
+
+# Local clasp config (contains script ID)
+.clasp.json
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node modules (if using build tools)
+node_modules/
