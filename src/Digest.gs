@@ -109,6 +109,7 @@ function generateDigestContent(emails) {
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
     h1 { color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 10px; }
@@ -126,23 +127,27 @@ function generateDigestContent(emails) {
     .priority-high { background: #fce8e6; color: #c5221f; }
     .priority-medium { background: #fef7e0; color: #e37400; }
     .priority-low { background: #e6f4ea; color: #137333; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+    .dot-red { background: #ea4335; }
+    .dot-yellow { background: #fbbc04; }
+    .dot-green { background: #34a853; }
   </style>
 </head>
 <body>
-  <h1>📧 Your Daily Email Digest</h1>
+  <h1>Your Daily Email Digest</h1>
   <p>${dateStr}</p>
 
   <div class="stats">
-    <strong>${emails.length} unread emails</strong> •
-    🔴 ${highPriority.length} high priority •
-    🟡 ${mediumPriority.length} medium •
-    🟢 ${lowPriority.length} low
+    <strong>${emails.length} unread emails</strong> |
+    <span class="dot dot-red"></span>${highPriority.length} high priority |
+    <span class="dot dot-yellow"></span>${mediumPriority.length} medium |
+    <span class="dot dot-green"></span>${lowPriority.length} low
   </div>
 `;
 
   // High priority section
   if (highPriority.length > 0) {
-    html += '<h2>🔴 High Priority</h2>';
+    html += '<h2><span class="dot dot-red"></span> High Priority</h2>';
     highPriority.forEach(function(email) {
       html += buildEmailItemHtml(email, 'high');
     });
@@ -150,7 +155,7 @@ function generateDigestContent(emails) {
 
   // Medium priority section
   if (mediumPriority.length > 0) {
-    html += '<h2>🟡 Medium Priority</h2>';
+    html += '<h2><span class="dot dot-yellow"></span> Medium Priority</h2>';
     mediumPriority.forEach(function(email) {
       html += buildEmailItemHtml(email, 'medium');
     });
@@ -158,7 +163,7 @@ function generateDigestContent(emails) {
 
   // Low priority section
   if (lowPriority.length > 0) {
-    html += '<h2>🟢 Low Priority</h2>';
+    html += '<h2><span class="dot dot-green"></span> Low Priority</h2>';
     lowPriority.forEach(function(email) {
       html += buildEmailItemHtml(email, 'low');
     });
@@ -175,7 +180,7 @@ function generateDigestContent(emails) {
 `;
 
   return {
-    subject: `📧 Daily Digest: ${highPriority.length} high priority, ${emails.length} total (${dateStr})`,
+    subject: `Daily Digest: ${highPriority.length} high priority, ${emails.length} total (${dateStr})`,
     body: html
   };
 }
