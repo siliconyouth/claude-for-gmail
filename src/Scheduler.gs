@@ -10,6 +10,7 @@ const PREF_AUTO_LABEL_ENABLED = 'auto_label_enabled';
 const PREF_DIGEST_ENABLED = 'digest_enabled';
 const PREF_DIGEST_HOUR = 'digest_hour';
 const PREF_LAST_DIGEST_DATE = 'last_digest_date';
+const PREF_LAST_DIGEST_TIMESTAMP = 'last_digest_timestamp';
 
 /**
  * Main scheduled task - runs hourly
@@ -63,11 +64,24 @@ function hasDigestSentToday() {
 }
 
 /**
- * Mark digest as sent for today
+ * Mark digest as sent and store timestamp
  */
 function markDigestSent() {
-  const today = new Date().toDateString();
-  setPreference(PREF_LAST_DIGEST_DATE, today);
+  const now = new Date();
+  setPreference(PREF_LAST_DIGEST_DATE, now.toDateString());
+  setPreference(PREF_LAST_DIGEST_TIMESTAMP, now.getTime());
+}
+
+/**
+ * Get the timestamp of the last digest sent
+ * @returns {Date|null} Date of last digest or null if never sent
+ */
+function getLastDigestTimestamp() {
+  const timestamp = getPreference(PREF_LAST_DIGEST_TIMESTAMP, null);
+  if (timestamp) {
+    return new Date(timestamp);
+  }
+  return null;
 }
 
 /**

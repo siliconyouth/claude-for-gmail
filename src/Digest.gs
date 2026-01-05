@@ -22,17 +22,30 @@ function sendDailyDigest() {
 }
 
 /**
- * Get emails for the digest (unread from last 24 hours, prioritized)
- * Optimized: limits to 8 emails, uses caching, has timeout protection
+ * Get emails for the digest (all unread since last digest)
+ * Optimized: limits to 10 emails, uses caching, has timeout protection
  * @returns {Object[]} Array of email objects with metadata and analysis
  */
 function getDigestEmails() {
-  const oneDayAgo = new Date();
-  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  // Get emails since last digest, or last 7 days if first digest
+  const lastDigest = getLastDigestTimestamp();
+  let searchAfter;
 
-  // Search for unread emails from the last 24 hours (limit to 8 for performance)
-  const query = `is:unread after:${formatDateForSearch(oneDayAgo)}`;
-  const threads = GmailApp.search(query, 0, 8);
+  if (lastDigest) {
+    searchAfter = lastDigest;
+    Logger.log('Digest: searching for emails since ' + lastDigest.toISOString());
+  } else {
+    // First digest - get last 7 days
+    searchAfter = new Date();
+    searchAfter.setDate(searchAfter.getDate() - 7);
+    Logger.log('Digest: first run, searching last 7 days');
+  }
+
+  // Search for unread emails since last digest (limit to 10 for performance)
+  const query = `is:unread after:${formatDateForSearch(searchAfter)}`;
+  const threads = GmailApp.search(query, 0, 10);
+
+  Logger.log('Digest: found ' + threads.length + ' unread threads');
 
   const emails = [];
   const startTime = Date.now();

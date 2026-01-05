@@ -977,6 +977,7 @@ function onToggleAutoLabel(e) {
 function onSendDigestNow(e) {
   try {
     sendDailyDigest();
+    markDigestSent(); // Mark timestamp so next digest only gets new emails
     return CardService.newActionResponseBuilder()
       .setNotification(
         CardService.newNotification()
