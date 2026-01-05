@@ -1,32 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <defs>
-    <!-- Main gradient: Blue to Violet to Cyan -->
-    <linearGradient id="aiGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#3b82f6"/>
-      <stop offset="50%" style="stop-color:#8b5cf6"/>
-      <stop offset="100%" style="stop-color:#22d3ee"/>
-    </linearGradient>
-  </defs>
+  <!-- Square background with rounded corners -->
+  <rect x="4" y="4" width="120" height="120" rx="20" ry="20" fill="#8b5cf6"/>
 
-  <!-- Background circle with gradient -->
-  <circle cx="64" cy="64" r="60" fill="url(#aiGradient)"/>
-
-  <!-- AI Sparkle - Main 4-point star (thicker, more prominent) -->
-  <path d="M64 18
-           L72 52 L74 54
-           L108 64
-           L74 74 L72 76
-           L64 110
-           L56 76 L54 74
-           L20 64
-           L54 54 L56 52 Z"
-        fill="#ffffff"/>
-
-  <!-- Accent sparkle top-right -->
-  <path d="M95 28 L98 38 L100 40 L110 43 L100 46 L98 48 L95 58 L92 48 L90 46 L80 43 L90 40 L92 38 Z"
-        fill="#ffffff" opacity="0.85"/>
-
-  <!-- Accent sparkle bottom-left -->
-  <path d="M33 70 L36 78 L38 80 L46 82 L38 84 L36 86 L33 94 L30 86 L28 84 L20 82 L28 80 L30 78 Z"
-        fill="#ffffff" opacity="0.85"/>
+  <!-- @ symbol in Inter font -->
+  <text x="64" y="92"
+        font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif"
+        font-size="90"
+        font-weight="600"
+        fill="#ffffff"
+        text-anchor="middle">@</text>
 </svg>
