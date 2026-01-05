@@ -121,8 +121,10 @@ function buildHomepageCard() {
   }
 
   statusSection.addWidget(
-    CardService.newTextParagraph()
-      .setText(apiKeyOk ? '✅ API: ' + apiKeyStatus : '❌ API Key Not Set\nGo to Project Settings → Script Properties')
+    CardService.newDecoratedText()
+      .setText(apiKeyOk ? 'API: ' + apiKeyStatus : 'API Key Not Set')
+      .setBottomLabel(apiKeyOk ? '' : 'Go to Project Settings → Script Properties')
+      .setStartIcon(CardService.newIconImage().setIcon(apiKeyOk ? CardService.Icon.CONFIRM : CardService.Icon.NONE))
   );
 
   // Settings button
@@ -130,10 +132,10 @@ function buildHomepageCard() {
     .setFunctionName('onOpenSettings');
 
   statusSection.addWidget(
-    CardService.newTextButton()
-      .setText('⚙️ Settings')
+    CardService.newDecoratedText()
+      .setText('Settings')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.INVITE))
       .setOnClickAction(settingsAction)
-      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
   );
 
   // Automation section
@@ -183,9 +185,9 @@ function buildHomepageCard() {
 
   automationSection.addWidget(
     CardService.newTextButton()
-      .setText('📧 Send Digest Now')
+      .setText('Send Digest Now')
       .setOnClickAction(sendDigestAction)
-      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
 
   card.addSection(welcomeSection);
@@ -224,7 +226,7 @@ function buildEmailActionCard(messageId) {
 
   actionsSection.addWidget(
     CardService.newTextButton()
-      .setText('🔍 Analyze Email')
+      .setText('Analyze Email')
       .setOnClickAction(analyzeAction)
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
@@ -237,7 +239,7 @@ function buildEmailActionCard(messageId) {
 
   actionsSection.addWidget(
     CardService.newTextButton()
-      .setText('📝 Draft Reply')
+      .setText('Draft Reply')
       .setOnClickAction(draftAction)
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
@@ -250,7 +252,7 @@ function buildEmailActionCard(messageId) {
 
   actionsSection.addWidget(
     CardService.newTextButton()
-      .setText('✅ Extract Action Items')
+      .setText('Extract Action Items')
       .setOnClickAction(extractAction)
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
@@ -263,9 +265,9 @@ function buildEmailActionCard(messageId) {
 
   actionsSection.addWidget(
     CardService.newTextButton()
-      .setText('📊 Full Analysis')
+      .setText('Full Analysis')
       .setOnClickAction(fullAnalysisAction)
-      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
 
   card.addSection(actionsSection);
@@ -280,10 +282,10 @@ function buildEmailActionCard(messageId) {
     .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
   templatesSection.addWidget(
-    CardService.newTextButton()
-      .setText('📋 Use Template')
+    CardService.newDecoratedText()
+      .setText('Use Template')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.DESCRIPTION))
       .setOnClickAction(templateAction)
-      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
   );
 
   // Smart label button (with loading spinner)
@@ -293,10 +295,10 @@ function buildEmailActionCard(messageId) {
     .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
   templatesSection.addWidget(
-    CardService.newTextButton()
-      .setText('🏷️ Apply Smart Labels')
+    CardService.newDecoratedText()
+      .setText('Apply Smart Labels')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
       .setOnClickAction(labelAction)
-      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
   );
 
   card.addSection(templatesSection);
@@ -552,7 +554,7 @@ function buildSummaryResultCard(metadata, summary, messageId) {
 
   actionsSection.addWidget(
     CardService.newTextButton()
-      .setText('📝 Draft Reply')
+      .setText('Draft Reply')
       .setOnClickAction(draftAction)
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
@@ -563,9 +565,9 @@ function buildSummaryResultCard(metadata, summary, messageId) {
 
   actionsSection.addWidget(
     CardService.newTextButton()
-      .setText('📊 Full Analysis')
+      .setText('Full Analysis')
       .setOnClickAction(fullAction)
-      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
 
   card.addSection(actionsSection);
@@ -617,7 +619,7 @@ function buildDraftOptionsCard(messageId) {
 
   section.addWidget(
     CardService.newTextButton()
-      .setText('✨ Generate Draft')
+      .setText('Generate Draft')
       .setOnClickAction(generateAction)
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
@@ -657,8 +659,10 @@ function buildDraftResultCard(replyText, draftId, messageId) {
   // Success message
   const statusSection = CardService.newCardSection()
     .addWidget(
-      CardService.newTextParagraph()
-        .setText('✅ Draft saved successfully. Check your Drafts folder to review and send.')
+      CardService.newDecoratedText()
+        .setText('Draft saved successfully')
+        .setBottomLabel('Check your Drafts folder to review and send')
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CONFIRM))
     );
 
   // Regenerate option
@@ -668,9 +672,9 @@ function buildDraftResultCard(replyText, draftId, messageId) {
 
   statusSection.addWidget(
     CardService.newTextButton()
-      .setText('🔄 Try Different Options')
+      .setText('Try Different Options')
       .setOnClickAction(regenerateAction)
-      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
 
   card.addSection(statusSection);
@@ -848,7 +852,7 @@ function buildFullAnalysisCard(metadata, summary, analysis, actionItems, message
 
   buttonSection.addWidget(
     CardService.newTextButton()
-      .setText('📝 Draft Reply')
+      .setText('Draft Reply')
       .setOnClickAction(draftAction)
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
@@ -1256,7 +1260,7 @@ function buildSettingsCard() {
 
   saveSection.addWidget(
     CardService.newTextButton()
-      .setText('💾 Save Settings')
+      .setText('Save Settings')
       .setOnClickAction(saveAction)
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
