@@ -1567,7 +1567,7 @@ function onShowLanguageOptions(e) {
 }
 
 /**
- * Build language options card
+ * Build language options card with all Google Translate languages
  * @param {Object} detected - Detected language info
  * @param {string} messageId - Message ID
  * @returns {Card}
@@ -1578,7 +1578,7 @@ function buildLanguageOptionsCard(detected, messageId) {
   card.setHeader(
     CardService.newCardHeader()
       .setTitle('Language & Translation')
-      .setSubtitle('Detected: ' + detected.languageName)
+      .setSubtitle('Powered by Google Translate')
       .setImageStyle(CardService.ImageStyle.CIRCLE)
       .setImageUrl(LOGO_URL)
   );
@@ -1594,29 +1594,30 @@ function buildLanguageOptionsCard(detected, messageId) {
       .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.PERSON))
   );
 
+  if (detected.service) {
+    detectionSection.addWidget(
+      CardService.newTextParagraph()
+        .setText('Service: ' + detected.service)
+    );
+  }
+
   card.addSection(detectionSection);
 
-  // Translation options
-  const translateSection = CardService.newCardSection()
-    .setHeader('Translate To');
+  // Quick translate section (common languages)
+  const quickTranslateSection = CardService.newCardSection()
+    .setHeader('Quick Translate');
 
-  const languages = [
-    { code: 'en', name: 'English' },
-    { code: 'es', name: 'Spanish' },
-    { code: 'fr', name: 'French' },
-    { code: 'de', name: 'German' },
-    { code: 'zh', name: 'Chinese' },
-    { code: 'ja', name: 'Japanese' }
-  ];
+  // Use common languages from Translation.gs
+  const commonLangs = getCommonLanguages().slice(0, 12); // First 12 common languages
 
-  languages.forEach(function(lang) {
+  commonLangs.forEach(function(lang) {
     if (lang.code !== detected.language) {
       const action = CardService.newAction()
         .setFunctionName('onTranslateEmail')
         .setParameters({ messageId: messageId, targetLanguage: lang.code })
         .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
-      translateSection.addWidget(
+      quickTranslateSection.addWidget(
         CardService.newDecoratedText()
           .setText(lang.name)
           .setOnClickAction(action)
@@ -1625,13 +1626,27 @@ function buildLanguageOptionsCard(detected, messageId) {
     }
   });
 
-  card.addSection(translateSection);
+  // More languages button
+  const moreLanguagesAction = CardService.newAction()
+    .setFunctionName('onShowAllLanguages')
+    .setParameters({ messageId: messageId, mode: 'translate' });
 
-  // Reply in language
+  quickTranslateSection.addWidget(
+    CardService.newTextButton()
+      .setText('More Languages (100+)')
+      .setOnClickAction(moreLanguagesAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+  );
+
+  card.addSection(quickTranslateSection);
+
+  // Quick reply in language
   const replySection = CardService.newCardSection()
     .setHeader('Reply In');
 
-  languages.forEach(function(lang) {
+  const replyLangs = getCommonLanguages().slice(0, 6); // First 6 for reply
+
+  replyLangs.forEach(function(lang) {
     const action = CardService.newAction()
       .setFunctionName('onReplyInLanguage')
       .setParameters({ messageId: messageId, language: lang.code })
@@ -1645,7 +1660,151 @@ function buildLanguageOptionsCard(detected, messageId) {
     );
   });
 
+  // More languages for reply
+  const moreReplyAction = CardService.newAction()
+    .setFunctionName('onShowAllLanguages')
+    .setParameters({ messageId: messageId, mode: 'reply' });
+
+  replySection.addWidget(
+    CardService.newTextButton()
+      .setText('More Languages')
+      .setOnClickAction(moreReplyAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+  );
+
   card.addSection(replySection);
+
+  return card.build();
+}
+
+/**
+ * Show all available languages for selection
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onShowAllLanguages(e) {
+  const messageId = e.parameters.messageId;
+  const mode = e.parameters.mode; // 'translate' or 'reply'
+  const card = buildAllLanguagesCard(messageId, mode);
+
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().pushCard(card))
+    .build();
+}
+
+/**
+ * Build card with all 100+ languages organized by region
+ * @param {string} messageId - Message ID
+ * @param {string} mode - 'translate' or 'reply'
+ * @returns {Card}
+ */
+function buildAllLanguagesCard(messageId, mode) {
+  const card = CardService.newCardBuilder();
+
+  const title = mode === 'translate' ? 'Translate To' : 'Reply In';
+
+  card.setHeader(
+    CardService.newCardHeader()
+      .setTitle(title)
+      .setSubtitle('100+ languages available')
+      .setImageStyle(CardService.ImageStyle.CIRCLE)
+      .setImageUrl(LOGO_URL)
+  );
+
+  // Get language families for organized display
+  const families = getLanguageFamilies();
+
+  // European languages
+  const europeanSection = CardService.newCardSection()
+    .setHeader('European Languages');
+
+  families['European'].slice(0, 15).forEach(function(code) {
+    const langName = getLanguageName(code);
+    const action = CardService.newAction()
+      .setFunctionName(mode === 'translate' ? 'onTranslateEmail' : 'onReplyInLanguage')
+      .setParameters(mode === 'translate'
+        ? { messageId: messageId, targetLanguage: code }
+        : { messageId: messageId, language: code })
+      .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+    europeanSection.addWidget(
+      CardService.newDecoratedText()
+        .setText(langName)
+        .setOnClickAction(action)
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+    );
+  });
+
+  card.addSection(europeanSection);
+
+  // Asian languages
+  const asianSection = CardService.newCardSection()
+    .setHeader('Asian Languages');
+
+  families['Asian'].slice(0, 15).forEach(function(code) {
+    const langName = getLanguageName(code);
+    const action = CardService.newAction()
+      .setFunctionName(mode === 'translate' ? 'onTranslateEmail' : 'onReplyInLanguage')
+      .setParameters(mode === 'translate'
+        ? { messageId: messageId, targetLanguage: code }
+        : { messageId: messageId, language: code })
+      .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+    asianSection.addWidget(
+      CardService.newDecoratedText()
+        .setText(langName)
+        .setOnClickAction(action)
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+    );
+  });
+
+  card.addSection(asianSection);
+
+  // Middle Eastern languages
+  const middleEastSection = CardService.newCardSection()
+    .setHeader('Middle Eastern');
+
+  families['Middle Eastern'].forEach(function(code) {
+    const langName = getLanguageName(code);
+    const action = CardService.newAction()
+      .setFunctionName(mode === 'translate' ? 'onTranslateEmail' : 'onReplyInLanguage')
+      .setParameters(mode === 'translate'
+        ? { messageId: messageId, targetLanguage: code }
+        : { messageId: messageId, language: code })
+      .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+    middleEastSection.addWidget(
+      CardService.newDecoratedText()
+        .setText(langName)
+        .setOnClickAction(action)
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+    );
+  });
+
+  card.addSection(middleEastSection);
+
+  // African languages
+  const africanSection = CardService.newCardSection()
+    .setHeader('African Languages');
+
+  families['African'].slice(0, 8).forEach(function(code) {
+    const langName = getLanguageName(code);
+    const action = CardService.newAction()
+      .setFunctionName(mode === 'translate' ? 'onTranslateEmail' : 'onReplyInLanguage')
+      .setParameters(mode === 'translate'
+        ? { messageId: messageId, targetLanguage: code }
+        : { messageId: messageId, language: code })
+      .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+    africanSection.addWidget(
+      CardService.newDecoratedText()
+        .setText(langName)
+        .setOnClickAction(action)
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+    );
+  });
+
+  card.addSection(africanSection);
 
   return card.build();
 }
@@ -1689,26 +1848,75 @@ function onTranslateEmail(e) {
 function buildTranslationResultCard(result, messageId) {
   const card = CardService.newCardBuilder();
 
+  const targetName = result.targetLanguageName || getLanguageName(result.targetLanguage) || result.targetLanguage;
+
   card.setHeader(
     CardService.newCardHeader()
       .setTitle('Translation')
-      .setSubtitle('From: ' + result.sourceLanguage)
+      .setSubtitle('To: ' + targetName)
+      .setImageStyle(CardService.ImageStyle.CIRCLE)
+      .setImageUrl(LOGO_URL)
   );
 
-  const section = CardService.newCardSection()
+  // Translation info section
+  const infoSection = CardService.newCardSection();
+
+  infoSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Source: ' + (result.sourceLanguage === 'auto' ? 'Auto-detected' : result.sourceLanguage))
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.PERSON))
+  );
+
+  if (result.service) {
+    infoSection.addWidget(
+      CardService.newDecoratedText()
+        .setText(result.service)
+        .setBottomLabel('Translation service')
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR))
+    );
+  }
+
+  card.addSection(infoSection);
+
+  // Translated text section
+  const textSection = CardService.newCardSection()
+    .setHeader('Translated Text')
     .addWidget(
       CardService.newTextParagraph()
         .setText(result.translatedText)
     );
 
-  if (result.notes) {
-    section.addWidget(
+  if (result.notes && result.notes.length > 0) {
+    textSection.addWidget(
       CardService.newTextParagraph()
         .setText('Note: ' + result.notes)
     );
   }
 
-  card.addSection(section);
+  card.addSection(textSection);
+
+  // Action buttons
+  const actionsSection = CardService.newCardSection();
+
+  // Copy translation functionality note
+  actionsSection.addWidget(
+    CardService.newTextParagraph()
+      .setText('Select and copy the translated text above to use it.')
+  );
+
+  // Draft reply with translation
+  const draftAction = CardService.newAction()
+    .setFunctionName('onDraftReplyStart')
+    .setParameters({ messageId: messageId });
+
+  actionsSection.addWidget(
+    CardService.newTextButton()
+      .setText('Draft Reply')
+      .setOnClickAction(draftAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+  );
+
+  card.addSection(actionsSection);
 
   return card.build();
 }

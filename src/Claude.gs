@@ -398,94 +398,42 @@ Respond ONLY with valid JSON, no other text.`;
 }
 
 // ============================================================================
-// MULTI-LANGUAGE SUPPORT
+// MULTI-LANGUAGE SUPPORT (Uses Google Translate - FREE)
 // ============================================================================
 
 /**
- * Detect the language of an email
+ * Detect the language of an email using Google Translate
  * @param {string} emailBody - The email content
  * @returns {Object} Language detection result with code and confidence
  */
 function detectLanguage(emailBody) {
-  const systemPrompt = `You are a language detection expert. Analyze the text and return JSON with:
-- language: the ISO 639-1 language code (e.g., "en", "es", "fr", "de", "zh", "ja", "ko", "ar", "ru", "pt")
-- languageName: the full name of the language in English
-- confidence: "high", "medium", or "low"
-- script: the writing script used (e.g., "Latin", "Cyrillic", "Arabic", "CJK", "Devanagari")
-
-Respond ONLY with valid JSON, no other text.`;
-
-  const prompt = `Detect the language of this text:\n\n${emailBody.substring(0, 2000)}`;
-
-  const response = askClaude(prompt, systemPrompt);
-
-  try {
-    return parseClaudeJson(response);
-  } catch (e) {
-    return {
-      language: 'en',
-      languageName: 'English',
-      confidence: 'low',
-      script: 'Latin'
-    };
-  }
+  // Use Google Translate for free language detection
+  return detectLanguageGoogle(emailBody);
 }
 
 /**
- * Translate email content to a target language
+ * Translate email content using Google Translate (FREE - no API key needed)
+ * Supports 100+ languages
  * @param {string} emailBody - The email content to translate
  * @param {string} targetLanguage - Target language code (e.g., "en", "es", "fr")
  * @returns {Object} Translation result
  */
 function translateEmail(emailBody, targetLanguage) {
-  const languageNames = {
-    'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
-    'it': 'Italian', 'pt': 'Portuguese', 'zh': 'Chinese', 'ja': 'Japanese',
-    'ko': 'Korean', 'ar': 'Arabic', 'ru': 'Russian', 'hi': 'Hindi',
-    'nl': 'Dutch', 'pl': 'Polish', 'tr': 'Turkish', 'vi': 'Vietnamese'
-  };
-
-  const targetName = languageNames[targetLanguage] || targetLanguage;
-
-  const systemPrompt = `You are a professional translator. Translate the email to ${targetName}.
-Maintain the original tone, formatting, and intent. Keep names, dates, and technical terms as appropriate.
-Return JSON with:
-- translatedText: the full translation
-- sourceLanguage: detected source language code
-- notes: any translation notes (optional, use empty string if none)
-
-Respond ONLY with valid JSON, no other text.`;
-
-  const prompt = `Translate this email to ${targetName}:\n\n${emailBody}`;
-
-  const response = askClaude(prompt, systemPrompt);
-
-  try {
-    return parseClaudeJson(response);
-  } catch (e) {
-    return {
-      translatedText: emailBody,
-      sourceLanguage: 'unknown',
-      notes: 'Translation failed'
-    };
-  }
+  // Use Google Translate (free, no API key required)
+  return translateEmailGoogle(emailBody, targetLanguage);
 }
 
 /**
  * Generate a reply in a specific language
+ * Uses Claude AI to generate the reply, then optionally translates if needed
  * @param {string} emailBody - The original email content
  * @param {string} instructions - Reply instructions
  * @param {string} replyLanguage - Language code for the reply
  * @returns {string} Generated reply in the specified language
  */
 function generateReplyInLanguage(emailBody, instructions, replyLanguage) {
-  const languageNames = {
-    'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
-    'it': 'Italian', 'pt': 'Portuguese', 'zh': 'Chinese', 'ja': 'Japanese',
-    'ko': 'Korean', 'ar': 'Arabic', 'ru': 'Russian', 'hi': 'Hindi'
-  };
-
-  const languageName = languageNames[replyLanguage] || replyLanguage;
+  // Use the full language list from Translation.gs
+  const languageName = getLanguageName(replyLanguage);
 
   // Get user preferences
   const tone = getPreference(PREF_REPLY_TONE, DEFAULT_REPLY_TONE);
