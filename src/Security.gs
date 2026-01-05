@@ -520,16 +520,28 @@ function getSecurityStats() {
  * @returns {Object} Batch scan results
  */
 function batchSecurityScan(count) {
-  count = count || 10;
+  count = Math.min(count || 10, 50); // Cap at 50 for timeout safety
   const threads = GmailApp.getInboxThreads(0, count);
   const results = {
     scanned: 0,
     threats: [],
     safe: 0,
-    errors: 0
+    errors: 0,
+    timedOut: false
   };
 
-  threads.forEach(function(thread) {
+  const startTime = Date.now();
+  const MAX_TIME = 5 * 60 * 1000; // 5 minutes max (leave 1 min buffer)
+
+  for (let i = 0; i < threads.length; i++) {
+    // Timeout protection
+    if (Date.now() - startTime > MAX_TIME) {
+      Logger.log('Batch scan timeout: processed ' + results.scanned + ' of ' + threads.length);
+      results.timedOut = true;
+      break;
+    }
+
+    const thread = threads[i];
     try {
       const message = thread.getMessages()[0];
       const from = message.getFrom();
@@ -537,7 +549,7 @@ function batchSecurityScan(count) {
       // Skip whitelisted senders
       if (isSenderWhitelisted(from)) {
         results.safe++;
-        return;
+        continue;
       }
 
       // Run quick check first
@@ -558,8 +570,9 @@ function batchSecurityScan(count) {
 
     } catch (e) {
       results.errors++;
+      Logger.log('Batch scan error: ' + e.message);
     }
-  });
+  }
 
   trackFeatureUsage('batch_security_scan');
 

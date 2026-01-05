@@ -3148,15 +3148,15 @@ function buildScanCountSelectionCard() {
 
   section.addWidget(
     CardService.newTextParagraph()
-      .setText('Scanning more messages takes longer but provides broader coverage. AI analysis is performed on each email.')
+      .setText('Select how many recent inbox messages to scan. Due to time limits, scans are capped at 50 messages.')
   );
 
-  // Button grid for count selection
+  // Button grid for count selection (capped due to 6-min Apps Script limit)
   const counts = [
-    { value: 20, label: '20 messages', desc: 'Quick scan (~1 min)' },
-    { value: 50, label: '50 messages', desc: 'Standard scan (~2-3 min)' },
-    { value: 100, label: '100 messages', desc: 'Deep scan (~5 min)' },
-    { value: 0, label: 'ALL unread', desc: 'Full inbox scan (may take a while)' }
+    { value: 10, label: '10 messages', desc: 'Quick scan (~30 sec)' },
+    { value: 20, label: '20 messages', desc: 'Standard scan (~1 min)' },
+    { value: 35, label: '35 messages', desc: 'Extended scan (~2 min)' },
+    { value: 50, label: '50 messages (max)', desc: 'Full scan (~3 min)' }
   ];
 
   counts.forEach(function(opt) {
@@ -3197,7 +3197,7 @@ function buildScanCountSelectionCard() {
 function onBulkSecurityScanExecute(e) {
   try {
     const countParam = e.parameters.count;
-    const count = countParam === '0' ? 500 : parseInt(countParam, 10); // 0 means ALL (capped at 500)
+    const count = Math.min(parseInt(countParam, 10) || 20, 50); // Cap at 50 for timeout safety
 
     const results = batchSecurityScan(count);
     const card = buildBulkScanResultsCard(results);
@@ -3251,6 +3251,13 @@ function buildBulkScanResultsCard(results) {
       CardService.newDecoratedText()
         .setText('Errors: ' + results.errors)
         .setWrapText(true)
+    );
+  }
+
+  if (results.timedOut) {
+    summarySection.addWidget(
+      CardService.newTextParagraph()
+        .setText('⚠️ Scan stopped early due to time limit. Try scanning fewer messages.')
     );
   }
 
