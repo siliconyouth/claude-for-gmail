@@ -258,12 +258,14 @@ function reportAsPhishing(messageId) {
       throw new Error('Message not found');
     }
 
-    // Move to spam
-    message.moveToSpam();
+    const thread = message.getThread();
 
     // Add phishing label for tracking
     const label = getOrCreateLabel(SECURITY_LABEL_PHISHING);
-    message.getThread().addLabel(label);
+    thread.addLabel(label);
+
+    // Move thread to spam
+    thread.moveToSpam();
 
     // Log the report
     logSecurityAction('report_phishing', messageId);
@@ -296,12 +298,14 @@ function reportAsSpam(messageId) {
       throw new Error('Message not found');
     }
 
-    // Move to spam
-    message.moveToSpam();
+    const thread = message.getThread();
 
     // Add spam label for tracking
     const label = getOrCreateLabel(SECURITY_LABEL_SPAM);
-    message.getThread().addLabel(label);
+    thread.addLabel(label);
+
+    // Move thread to spam
+    thread.moveToSpam();
 
     // Log the report
     logSecurityAction('report_spam', messageId);
