@@ -2545,18 +2545,115 @@ function onSuggestSubject(e) {
 
 function onShowComposeTemplates(e) {
   const templates = getTemplates();
-  const section = CardService.newCardSection();
-  templates.slice(0, 15).forEach(function(t) {
-    section.addWidget(CardService.newDecoratedText()
-      .setText(t.name)
-      .setBottomLabel(t.category || 'general'));
-  });
   const card = CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('Templates').setSubtitle('25+ available'))
-    .addSection(section)
-    .build();
+    .setHeader(CardService.newCardHeader()
+      .setTitle('Reply Templates')
+      .setSubtitle(templates.length + ' templates available'));
+
+  // Group templates by category
+  const categories = {};
+  templates.forEach(function(t) {
+    const cat = t.category || 'general';
+    if (!categories[cat]) {
+      categories[cat] = [];
+    }
+    categories[cat].push(t);
+  });
+
+  // Category display names
+  const categoryNames = {
+    acknowledgment: 'Acknowledgment',
+    meetings: 'Meetings',
+    requests: 'Requests',
+    followup: 'Follow-ups',
+    thanks: 'Thank You',
+    declines: 'Declines & Apologies',
+    ooo: 'Out of Office',
+    introductions: 'Introductions',
+    updates: 'Status Updates',
+    feedback: 'Feedback',
+    general: 'General'
+  };
+
+  // Create a section for each category
+  Object.keys(categories).forEach(function(cat) {
+    const section = CardService.newCardSection()
+      .setHeader(categoryNames[cat] || cat)
+      .setCollapsible(true)
+      .setNumUncollapsibleWidgets(0);
+
+    categories[cat].forEach(function(t) {
+      const action = CardService.newAction()
+        .setFunctionName('onSelectTemplate')
+        .setParameters({ templateId: t.id, templateName: t.name });
+
+      section.addWidget(
+        CardService.newDecoratedText()
+          .setText(t.name)
+          .setBottomLabel(t.description || '')
+          .setWrapText(true)
+          .setOnClickAction(action)
+      );
+    });
+
+    card.addSection(section);
+  });
+
   return CardService.newActionResponseBuilder()
-    .setNavigation(CardService.newNavigation().pushCard(card))
+    .setNavigation(CardService.newNavigation().pushCard(card.build()))
+    .build();
+}
+
+function onSelectTemplate(e) {
+  const templateId = e.parameters.templateId;
+  const templateName = e.parameters.templateName;
+  const template = getTemplateById(templateId);
+
+  if (!template) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Template not found'))
+      .build();
+  }
+
+  // Build a card showing the template with option to copy or use
+  const card = CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader()
+      .setTitle(templateName)
+      .setSubtitle(template.category || 'Template'));
+
+  const previewSection = CardService.newCardSection()
+    .setHeader('Template Preview');
+
+  previewSection.addWidget(
+    CardService.newTextParagraph()
+      .setText(template.template)
+  );
+
+  card.addSection(previewSection);
+
+  // Actions section
+  const actionsSection = CardService.newCardSection();
+
+  // Copy to clipboard instruction
+  actionsSection.addWidget(
+    CardService.newTextParagraph()
+      .setText('<i>Copy the template above and paste into your email compose window, then customize the {{placeholders}}.</i>')
+  );
+
+  // Back button
+  const backAction = CardService.newAction()
+    .setFunctionName('onShowComposeTemplates');
+
+  actionsSection.addWidget(
+    CardService.newTextButton()
+      .setText('← Back to Templates')
+      .setOnClickAction(backAction)
+  );
+
+  card.addSection(actionsSection);
+
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().pushCard(card.build()))
     .build();
 }
 
