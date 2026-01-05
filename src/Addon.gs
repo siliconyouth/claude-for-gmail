@@ -435,6 +435,69 @@ function buildEmailActionCard(messageId) {
 
   card.addSection(templatesSection);
 
+  // Security section
+  const securitySection = CardService.newCardSection()
+    .setHeader('Security')
+    .setCollapsible(true);
+
+  // Quick security scan
+  const quickScanAction = CardService.newAction()
+    .setFunctionName('onQuickSecurityScan')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  securitySection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Quick Security Check')
+      .setBottomLabel('Fast pattern-based scan')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR))
+      .setOnClickAction(quickScanAction)
+  );
+
+  // Full AI security scan
+  const fullScanAction = CardService.newAction()
+    .setFunctionName('onFullSecurityScan')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  securitySection.addWidget(
+    CardService.newDecoratedText()
+      .setText('AI Security Analysis')
+      .setBottomLabel('Deep scan for phishing/scam')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+      .setOnClickAction(fullScanAction)
+  );
+
+  // Report as phishing
+  const reportPhishingAction = CardService.newAction()
+    .setFunctionName('onReportPhishing')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  securitySection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Report Phishing')
+      .setBottomLabel('Move to spam & report')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.NONE))
+      .setOnClickAction(reportPhishingAction)
+  );
+
+  // Report as spam
+  const reportSpamAction = CardService.newAction()
+    .setFunctionName('onReportSpam')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  securitySection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Report Spam')
+      .setBottomLabel('Move to spam folder')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.NONE))
+      .setOnClickAction(reportSpamAction)
+  );
+
+  card.addSection(securitySection);
+
   return card.build();
 }
 
@@ -2665,4 +2728,322 @@ function refreshCard(e) {
   return CardService.newActionResponseBuilder()
     .setNavigation(CardService.newNavigation().popToRoot())
     .build();
+}
+
+// ============================================================================
+// SECURITY HANDLERS
+// ============================================================================
+
+/**
+ * Quick security scan handler
+ */
+function onQuickSecurityScan(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const message = GmailApp.getMessageById(messageId);
+    if (!message) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Message not found'))
+        .build();
+    }
+
+    const result = quickSecurityCheck(message);
+    const card = buildSecurityResultCard(result, message, 'quick');
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    logError('onQuickSecurityScan', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Full AI security scan handler
+ */
+function onFullSecurityScan(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const message = GmailApp.getMessageById(messageId);
+    if (!message) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Message not found'))
+        .build();
+    }
+
+    const result = analyzeEmailSecurity(message);
+    const card = buildSecurityResultCard(result, message, 'full');
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    logError('onFullSecurityScan', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Build security result card
+ */
+function buildSecurityResultCard(result, message, scanType) {
+  const card = CardService.newCardBuilder();
+
+  // Determine header color/icon based on threat level
+  const threatLevel = result.threatLevel || 'unknown';
+  let statusIcon = CardService.Icon.STAR;
+  let statusText = 'Safe';
+
+  if (threatLevel === 'critical' || threatLevel === 'high') {
+    statusIcon = CardService.Icon.NONE;
+    statusText = threatLevel.toUpperCase() + ' RISK';
+  } else if (threatLevel === 'medium') {
+    statusIcon = CardService.Icon.CLOCK;
+    statusText = 'Medium Risk';
+  } else if (threatLevel === 'low') {
+    statusIcon = CardService.Icon.BOOKMARK;
+    statusText = 'Low Risk';
+  }
+
+  card.setHeader(CardService.newCardHeader()
+    .setTitle('Security Analysis')
+    .setSubtitle(statusText + ' - ' + (scanType === 'full' ? 'AI Scan' : 'Quick Scan')));
+
+  // Summary section
+  const summarySection = CardService.newCardSection()
+    .setHeader('Results');
+
+  summarySection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Threat Level: ' + threatLevel.toUpperCase())
+      .setWrapText(true)
+  );
+
+  if (result.confidence !== undefined) {
+    summarySection.addWidget(
+      CardService.newDecoratedText()
+        .setText('Confidence: ' + result.confidence + '%')
+        .setWrapText(true)
+    );
+  }
+
+  if (result.threatType && result.threatType !== 'none') {
+    summarySection.addWidget(
+      CardService.newDecoratedText()
+        .setText('Type: ' + result.threatType.toUpperCase())
+        .setWrapText(true)
+    );
+  }
+
+  if (result.summary) {
+    summarySection.addWidget(
+      CardService.newTextParagraph()
+        .setText('<b>Summary:</b> ' + result.summary)
+    );
+  }
+
+  card.addSection(summarySection);
+
+  // Red flags section
+  const flags = result.redFlags || result.indicators || [];
+  if (flags.length > 0) {
+    const flagsSection = CardService.newCardSection()
+      .setHeader('Red Flags (' + flags.length + ')')
+      .setCollapsible(true);
+
+    flags.forEach(function(flag) {
+      flagsSection.addWidget(
+        CardService.newDecoratedText()
+          .setText('⚠ ' + flag)
+          .setWrapText(true)
+      );
+    });
+
+    card.addSection(flagsSection);
+  }
+
+  // Recommendations section
+  if (result.recommendations && result.recommendations.length > 0) {
+    const recsSection = CardService.newCardSection()
+      .setHeader('Recommendations')
+      .setCollapsible(true);
+
+    result.recommendations.forEach(function(rec) {
+      recsSection.addWidget(
+        CardService.newDecoratedText()
+          .setText('• ' + rec)
+          .setWrapText(true)
+      );
+    });
+
+    card.addSection(recsSection);
+  }
+
+  // Actions section
+  const actionsSection = CardService.newCardSection()
+    .setHeader('Actions');
+
+  const messageId = message.getId();
+
+  // Archive as suspicious
+  const archiveAction = CardService.newAction()
+    .setFunctionName('onArchiveSuspicious')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  actionsSection.addWidget(
+    CardService.newTextButton()
+      .setText('Archive as Suspicious')
+      .setOnClickAction(archiveAction)
+  );
+
+  // Report phishing
+  const phishingAction = CardService.newAction()
+    .setFunctionName('onReportPhishing')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  actionsSection.addWidget(
+    CardService.newTextButton()
+      .setText('Report as Phishing')
+      .setOnClickAction(phishingAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+  );
+
+  // Mark as safe
+  const safeAction = CardService.newAction()
+    .setFunctionName('onMarkAsSafe')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  actionsSection.addWidget(
+    CardService.newTextButton()
+      .setText('Mark as Safe')
+      .setOnClickAction(safeAction)
+  );
+
+  card.addSection(actionsSection);
+
+  return card.build();
+}
+
+/**
+ * Report email as phishing handler
+ */
+function onReportPhishing(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const result = reportAsPhishing(messageId);
+
+    if (result.success) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Reported as phishing and moved to spam'))
+        .setNavigation(CardService.newNavigation().popToRoot())
+        .build();
+    } else {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Error: ' + result.error))
+        .build();
+    }
+
+  } catch (error) {
+    logError('onReportPhishing', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Report email as spam handler
+ */
+function onReportSpam(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const result = reportAsSpam(messageId);
+
+    if (result.success) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Reported as spam'))
+        .setNavigation(CardService.newNavigation().popToRoot())
+        .build();
+    } else {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Error: ' + result.error))
+        .build();
+    }
+
+  } catch (error) {
+    logError('onReportSpam', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Archive suspicious email handler
+ */
+function onArchiveSuspicious(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const result = archiveSuspiciousEmail(messageId, 'Manual archive from security scan');
+
+    if (result.success) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Archived and labeled as suspicious'))
+        .setNavigation(CardService.newNavigation().popToRoot())
+        .build();
+    } else {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Error: ' + result.error))
+        .build();
+    }
+
+  } catch (error) {
+    logError('onArchiveSuspicious', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Mark email as safe handler
+ */
+function onMarkAsSafe(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const result = markAsSafe(messageId);
+
+    if (result.success) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Marked as safe, sender whitelisted'))
+        .setNavigation(CardService.newNavigation().popToRoot())
+        .build();
+    } else {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Error: ' + result.error))
+        .build();
+    }
+
+  } catch (error) {
+    logError('onMarkAsSafe', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
 }
