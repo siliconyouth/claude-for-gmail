@@ -173,9 +173,10 @@ function buildHomepageCard() {
       )
   );
 
-  // Send digest now button
+  // Send digest now button (with loading spinner)
   const sendDigestAction = CardService.newAction()
-    .setFunctionName('onSendDigestNow');
+    .setFunctionName('onSendDigestNow')
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
   automationSection.addWidget(
     CardService.newTextButton()
@@ -210,10 +211,11 @@ function buildEmailActionCard(messageId) {
   const actionsSection = CardService.newCardSection()
     .setHeader('Quick Actions');
 
-  // Analyze button
+  // Analyze button (with loading spinner)
   const analyzeAction = CardService.newAction()
     .setFunctionName('onAnalyzeEmail')
-    .setParameters({ messageId: messageId });
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
   actionsSection.addWidget(
     CardService.newTextButton()
@@ -222,10 +224,11 @@ function buildEmailActionCard(messageId) {
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
 
-  // Draft reply button
+  // Draft reply button (with loading spinner)
   const draftAction = CardService.newAction()
     .setFunctionName('onDraftReplyStart')
-    .setParameters({ messageId: messageId });
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
   actionsSection.addWidget(
     CardService.newTextButton()
@@ -234,10 +237,11 @@ function buildEmailActionCard(messageId) {
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
 
-  // Extract actions button
+  // Extract actions button (with loading spinner)
   const extractAction = CardService.newAction()
     .setFunctionName('onExtractActions')
-    .setParameters({ messageId: messageId });
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
   actionsSection.addWidget(
     CardService.newTextButton()
@@ -246,10 +250,11 @@ function buildEmailActionCard(messageId) {
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
 
-  // Full analysis button
+  // Full analysis button (with loading spinner)
   const fullAnalysisAction = CardService.newAction()
     .setFunctionName('onFullAnalysis')
-    .setParameters({ messageId: messageId });
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
   actionsSection.addWidget(
     CardService.newTextButton()
@@ -266,7 +271,8 @@ function buildEmailActionCard(messageId) {
 
   const templateAction = CardService.newAction()
     .setFunctionName('onShowTemplates')
-    .setParameters({ messageId: messageId });
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
   templatesSection.addWidget(
     CardService.newTextButton()
@@ -275,10 +281,11 @@ function buildEmailActionCard(messageId) {
       .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
   );
 
-  // Smart label button
+  // Smart label button (with loading spinner)
   const labelAction = CardService.newAction()
     .setFunctionName('onApplySmartLabels')
-    .setParameters({ messageId: messageId });
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
   templatesSection.addWidget(
     CardService.newTextButton()
@@ -595,10 +602,11 @@ function buildDraftOptionsCard(messageId) {
       .setHint('e.g., "Decline politely" or "Ask for more details"')
   );
 
-  // Generate button
+  // Generate button (with loading spinner)
   const generateAction = CardService.newAction()
     .setFunctionName('onGenerateDraft')
-    .setParameters({ messageId: messageId });
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
   section.addWidget(
     CardService.newTextButton()
