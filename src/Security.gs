@@ -91,7 +91,10 @@ ${body.substring(0, 8000)}`;
 
   try {
     const response = askClaude(prompt, systemPrompt);
-    const analysis = JSON.parse(response);
+    Logger.log('Security scan response: ' + response.substring(0, 500));
+
+    // Use parseClaudeJson for robust JSON extraction
+    const analysis = parseClaudeJson(response);
 
     // Add metadata
     analysis.analyzedAt = new Date().toISOString();
@@ -103,14 +106,31 @@ ${body.substring(0, 8000)}`;
     return analysis;
 
   } catch (error) {
+    Logger.log('Security scan error: ' + error.message);
     logError('analyzeEmailSecurity', error);
+
+    // Provide more helpful error info
+    let errorSummary = 'Unable to complete security analysis';
+    let recommendations = ['Review email manually'];
+
+    if (error.message.includes('API key')) {
+      errorSummary = 'API key not configured';
+      recommendations = ['Set your Anthropic API key in Script Properties'];
+    } else if (error.message.includes('circuit breaker')) {
+      errorSummary = 'Too many API errors - temporarily paused';
+      recommendations = ['Wait a few minutes and try again'];
+    } else if (error.message.includes('JSON')) {
+      errorSummary = 'Failed to parse AI response';
+      recommendations = ['Try again or use Quick Security Check instead'];
+    }
+
     return {
       threatLevel: THREAT_LEVEL.LOW,
-      threatType: 'unknown',
+      threatType: 'error',
       confidence: 0,
-      summary: 'Unable to complete security analysis',
+      summary: errorSummary + ': ' + error.message,
       indicators: [],
-      recommendations: ['Review email manually'],
+      recommendations: recommendations,
       error: error.message
     };
   }
