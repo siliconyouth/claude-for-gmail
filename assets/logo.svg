@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <!-- Circle background -->
+  <!-- Black circle background -->
   <circle cx="64" cy="64" r="60" fill="#000000"/>
 
-  <!-- @ symbol in Inter font -->
-  <text x="64" y="92"
-        font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif"
-        font-size="90"
-        font-weight="600"
+  <!-- @ symbol in monospace font -->
+  <text x="64" y="88"
+        font-family="SF Mono, Menlo, Monaco, Consolas, Courier New, monospace"
+        font-size="80"
+        font-weight="500"
         fill="#ffffff"
         text-anchor="middle">@</text>
 </svg>
