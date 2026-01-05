@@ -15,7 +15,7 @@
   "addOns": {
     "common": {
       "name": "Claude for Gmail",
-      "logoUrl": "https://raw.githubusercontent.com/siliconyouth/claude-for-gmail/main/assets/logo.svg",
+      "logoUrl": "https://raw.githubusercontent.com/siliconyouth/claude-for-gmail/main/assets/logo.png",
       "homepageTrigger": {
         "runFunction": "onHomepage",
         "enabled": true
