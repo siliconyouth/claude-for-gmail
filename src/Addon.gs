@@ -122,6 +122,17 @@ function buildHomepageCard() {
       .setText(apiKeyOk ? '✅ API: ' + apiKeyStatus : '❌ API Key Not Set\nGo to Project Settings → Script Properties')
   );
 
+  // Settings button
+  const settingsAction = CardService.newAction()
+    .setFunctionName('onOpenSettings');
+
+  statusSection.addWidget(
+    CardService.newTextButton()
+      .setText('⚙️ Settings')
+      .setOnClickAction(settingsAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+  );
+
   // Automation section
   const automationSection = CardService.newCardSection()
     .setHeader('Automation');
@@ -1107,6 +1118,189 @@ function onApplySmartLabels(e) {
       .setNotification(
         CardService.newNotification()
           .setText('Error: ' + error.message)
+      )
+      .build();
+  }
+}
+
+// ============================================================================
+// SETTINGS HANDLERS
+// ============================================================================
+
+/**
+ * Open settings card
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onOpenSettings(e) {
+  const card = buildSettingsCard();
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().pushCard(card))
+    .build();
+}
+
+/**
+ * Build the settings card
+ * @returns {Card}
+ */
+function buildSettingsCard() {
+  const card = CardService.newCardBuilder();
+
+  card.setHeader(
+    CardService.newCardHeader()
+      .setTitle('Settings')
+      .setSubtitle('Customize your experience')
+  );
+
+  // Reply settings section
+  const replySection = CardService.newCardSection()
+    .setHeader('Reply Defaults');
+
+  // Tone dropdown
+  const currentTone = getPreference(PREF_REPLY_TONE, DEFAULT_REPLY_TONE);
+  const toneDropdown = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.DROPDOWN)
+    .setFieldName('replyTone')
+    .setTitle('Default Tone');
+
+  TONE_OPTIONS.forEach(function(option) {
+    toneDropdown.addItem(option.label, option.value, option.value === currentTone);
+  });
+
+  replySection.addWidget(toneDropdown);
+
+  // Length dropdown
+  const currentLength = getPreference(PREF_REPLY_LENGTH, DEFAULT_REPLY_LENGTH);
+  const lengthDropdown = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.DROPDOWN)
+    .setFieldName('replyLength')
+    .setTitle('Default Length');
+
+  LENGTH_OPTIONS.forEach(function(option) {
+    lengthDropdown.addItem(option.label, option.value, option.value === currentLength);
+  });
+
+  replySection.addWidget(lengthDropdown);
+
+  // Include greeting checkbox
+  const includeGreeting = getPreference(PREF_INCLUDE_GREETING, DEFAULT_INCLUDE_GREETING);
+  replySection.addWidget(
+    CardService.newSelectionInput()
+      .setType(CardService.SelectionInputType.CHECK_BOX)
+      .setFieldName('includeGreeting')
+      .addItem('Include greeting (Hi/Hello)', 'true', includeGreeting)
+  );
+
+  // Include signature checkbox
+  const includeSignature = getPreference(PREF_INCLUDE_SIGNATURE, DEFAULT_INCLUDE_SIGNATURE);
+  replySection.addWidget(
+    CardService.newSelectionInput()
+      .setType(CardService.SelectionInputType.CHECK_BOX)
+      .setFieldName('includeSignature')
+      .addItem('Include signature', 'true', includeSignature)
+  );
+
+  // Custom signature
+  const signatureText = getPreference(PREF_SIGNATURE_TEXT, DEFAULT_SIGNATURE_TEXT);
+  replySection.addWidget(
+    CardService.newTextInput()
+      .setFieldName('signatureText')
+      .setTitle('Custom Signature')
+      .setHint('e.g., Best regards, John')
+      .setValue(signatureText)
+  );
+
+  card.addSection(replySection);
+
+  // Digest settings section
+  const digestSection = CardService.newCardSection()
+    .setHeader('Daily Digest');
+
+  // Digest hour dropdown
+  const currentHour = getPreference(PREF_DIGEST_HOUR, 8);
+  const hourDropdown = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.DROPDOWN)
+    .setFieldName('digestHour')
+    .setTitle('Send Time');
+
+  DIGEST_HOUR_OPTIONS.forEach(function(option) {
+    hourDropdown.addItem(option.label, String(option.value), option.value === currentHour);
+  });
+
+  digestSection.addWidget(hourDropdown);
+
+  card.addSection(digestSection);
+
+  // Save button section
+  const saveSection = CardService.newCardSection();
+
+  const saveAction = CardService.newAction()
+    .setFunctionName('onSaveSettings');
+
+  saveSection.addWidget(
+    CardService.newTextButton()
+      .setText('💾 Save Settings')
+      .setOnClickAction(saveAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+  );
+
+  card.addSection(saveSection);
+
+  return card.build();
+}
+
+/**
+ * Save settings
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onSaveSettings(e) {
+  try {
+    const formInputs = e.formInputs || {};
+
+    // Save reply tone
+    if (formInputs.replyTone) {
+      setPreference(PREF_REPLY_TONE, formInputs.replyTone[0]);
+    }
+
+    // Save reply length
+    if (formInputs.replyLength) {
+      setPreference(PREF_REPLY_LENGTH, formInputs.replyLength[0]);
+    }
+
+    // Save include greeting
+    const includeGreeting = formInputs.includeGreeting && formInputs.includeGreeting[0] === 'true';
+    setPreference(PREF_INCLUDE_GREETING, includeGreeting);
+
+    // Save include signature
+    const includeSignature = formInputs.includeSignature && formInputs.includeSignature[0] === 'true';
+    setPreference(PREF_INCLUDE_SIGNATURE, includeSignature);
+
+    // Save signature text
+    if (formInputs.signatureText) {
+      setPreference(PREF_SIGNATURE_TEXT, formInputs.signatureText[0] || '');
+    }
+
+    // Save digest hour
+    if (formInputs.digestHour) {
+      const hour = parseInt(formInputs.digestHour[0], 10);
+      setPreference(PREF_DIGEST_HOUR, hour);
+    }
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText('Settings saved!')
+      )
+      .setNavigation(CardService.newNavigation().popCard())
+      .build();
+
+  } catch (error) {
+    Logger.log('Save settings error: ' + error.message);
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText('Error saving: ' + error.message)
       )
       .build();
   }

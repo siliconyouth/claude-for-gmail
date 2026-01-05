@@ -99,16 +99,55 @@ Keep summaries under 3 sentences unless the email is very complex.`;
 
 /**
  * Generate a reply draft using Claude
- * Note: Replies are not cached as they depend on user instructions
+ * Uses user preferences for tone, length, greeting, and signature
  * @param {string} emailBody - The original email content
  * @param {string} instructions - Optional instructions for the reply
  * @returns {string} A draft reply
  */
 function generateReply(emailBody, instructions) {
-  const systemPrompt = `You are an email assistant helping to draft professional replies.
-Write clear, concise, and appropriate responses.
-Match the tone of the original email when possible.
-Do not include a subject line - just the email body.`;
+  // Get user preferences
+  const tone = getPreference(PREF_REPLY_TONE, DEFAULT_REPLY_TONE);
+  const length = getPreference(PREF_REPLY_LENGTH, DEFAULT_REPLY_LENGTH);
+  const includeGreeting = getPreference(PREF_INCLUDE_GREETING, DEFAULT_INCLUDE_GREETING);
+  const includeSignature = getPreference(PREF_INCLUDE_SIGNATURE, DEFAULT_INCLUDE_SIGNATURE);
+  const signatureText = getPreference(PREF_SIGNATURE_TEXT, DEFAULT_SIGNATURE_TEXT);
+
+  // Build tone instructions
+  const toneMap = {
+    'professional': 'professional and polished',
+    'friendly': 'warm and friendly',
+    'formal': 'formal and respectful',
+    'casual': 'casual and relaxed',
+    'brief': 'brief and direct'
+  };
+
+  // Build length instructions
+  const lengthMap = {
+    'concise': '1-2 short paragraphs',
+    'detailed': '3-4 paragraphs with more detail',
+    'brief': '1-2 sentences only'
+  };
+
+  let systemPrompt = `You are an email assistant helping to draft replies.
+
+Tone: Write in a ${toneMap[tone] || 'professional'} style.
+Length: Keep the reply to ${lengthMap[length] || '1-2 paragraphs'}.`;
+
+  if (includeGreeting) {
+    systemPrompt += '\nStart with an appropriate greeting (Hi/Hello + name if known).';
+  } else {
+    systemPrompt += '\nDo not include a greeting - start directly with the response.';
+  }
+
+  if (includeSignature && signatureText) {
+    systemPrompt += `\nEnd with this signature: ${signatureText}`;
+  } else if (includeSignature) {
+    systemPrompt += '\nEnd with an appropriate sign-off (Best regards, Thanks, etc.).';
+  } else {
+    systemPrompt += '\nDo not include a sign-off or signature.';
+  }
+
+  systemPrompt += '\nDo not include a subject line - just the email body.';
 
   let prompt = `Please draft a reply to this email:\n\n${emailBody}`;
 

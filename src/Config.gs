@@ -12,6 +12,45 @@ const CONFIG = {
   MAX_EMAIL_LENGTH: 50000,
 };
 
+// User preference keys
+const PREF_REPLY_TONE = 'reply_tone';
+const PREF_REPLY_LENGTH = 'reply_length';
+const PREF_INCLUDE_GREETING = 'include_greeting';
+const PREF_INCLUDE_SIGNATURE = 'include_signature';
+const PREF_SIGNATURE_TEXT = 'signature_text';
+
+// Default values
+const DEFAULT_REPLY_TONE = 'professional';
+const DEFAULT_REPLY_LENGTH = 'concise';
+const DEFAULT_INCLUDE_GREETING = true;
+const DEFAULT_INCLUDE_SIGNATURE = true;
+const DEFAULT_SIGNATURE_TEXT = '';
+
+// Available options
+const TONE_OPTIONS = [
+  { value: 'professional', label: 'Professional' },
+  { value: 'friendly', label: 'Friendly' },
+  { value: 'formal', label: 'Formal' },
+  { value: 'casual', label: 'Casual' },
+  { value: 'brief', label: 'Brief & Direct' }
+];
+
+const LENGTH_OPTIONS = [
+  { value: 'concise', label: 'Concise (1-2 paragraphs)' },
+  { value: 'detailed', label: 'Detailed (3-4 paragraphs)' },
+  { value: 'brief', label: 'Brief (1-2 sentences)' }
+];
+
+const DIGEST_HOUR_OPTIONS = [
+  { value: 6, label: '6:00 AM' },
+  { value: 7, label: '7:00 AM' },
+  { value: 8, label: '8:00 AM' },
+  { value: 9, label: '9:00 AM' },
+  { value: 10, label: '10:00 AM' },
+  { value: 12, label: '12:00 PM' },
+  { value: 18, label: '6:00 PM' }
+];
+
 /**
  * Get the Claude API key from script properties
  * @returns {string} The API key
