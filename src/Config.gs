@@ -13,6 +13,7 @@ const CONFIG = {
 };
 
 // User preference keys
+const PREF_API_KEY = 'api_key';
 const PREF_REPLY_TONE = 'reply_tone';
 const PREF_REPLY_LENGTH = 'reply_length';
 const PREF_INCLUDE_GREETING = 'include_greeting';
