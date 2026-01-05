@@ -102,17 +102,23 @@ function buildHomepageCard() {
     .setHeader('Status');
 
   try {
-    getApiKey();
-    statusSection.addWidget(
-      CardService.newDecoratedText()
-        .setText('API Connected')
-        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CONFIRM))
-    );
+    const apiKey = getApiKey();
+    // Verify key exists and has reasonable length
+    if (apiKey && apiKey.length > 10) {
+      statusSection.addWidget(
+        CardService.newDecoratedText()
+          .setText('API Connected')
+          .setBottomLabel('Key: ' + apiKey.substring(0, 8) + '...')
+          .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CONFIRM))
+      );
+    } else {
+      throw new Error('Invalid key format');
+    }
   } catch (error) {
     statusSection.addWidget(
       CardService.newDecoratedText()
         .setText('API Key Not Set')
-        .setBottomLabel('Set in Project Settings → Script Properties')
+        .setBottomLabel('Error: ' + (error.message || 'Unknown'))
         .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.NONE))
     );
   }

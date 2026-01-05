@@ -74,6 +74,29 @@ function createReplyDraftById(messageId, instructions) {
 }
 
 /**
+ * Check if API key is set - run this to debug
+ */
+function checkApiKey() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const allProps = props.getProperties();
+    Logger.log('All script properties: ' + JSON.stringify(Object.keys(allProps)));
+
+    const apiKey = props.getProperty('CLAUDE_API_KEY');
+    if (apiKey) {
+      Logger.log('API key found: ' + apiKey.substring(0, 10) + '... (length: ' + apiKey.length + ')');
+      return true;
+    } else {
+      Logger.log('API key NOT found in script properties');
+      return false;
+    }
+  } catch (error) {
+    Logger.log('Error checking API key: ' + error.message);
+    return false;
+  }
+}
+
+/**
  * Test function to verify Claude API connection
  */
 function testClaudeConnection() {
