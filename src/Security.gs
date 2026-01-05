@@ -18,6 +18,10 @@ const SECURITY_LABEL_PHISHING = 'Claude/Phishing';
 const SECURITY_LABEL_SCAM = 'Claude/Scam';
 const SECURITY_LABEL_SPAM = 'Claude/Spam';
 
+// Cache keys
+const SECURITY_SCAN_CACHE_KEY = 'security_scan_cache';
+const SECURITY_CACHE_EXPIRY_DAYS = 7; // Cache results for 7 days
+
 /**
  * Analyze an email for security threats
  * @param {GmailMessage} message - The Gmail message to analyze
@@ -514,16 +518,125 @@ function getSecurityStats() {
   return stats;
 }
 
+// ============================================================================
+// SECURITY SCAN CACHE
+// ============================================================================
+
 /**
- * Batch scan recent emails for threats
- * @param {number} count - Number of emails to scan
- * @returns {Object} Batch scan results
+ * Get the security scan cache
+ * @returns {Object} Cache object with messageId keys
+ */
+function getSecurityScanCache() {
+  const props = PropertiesService.getUserProperties();
+  const cacheStr = props.getProperty(SECURITY_SCAN_CACHE_KEY);
+
+  if (!cacheStr) {
+    return { scanned: {}, threats: [], lastCleanup: Date.now() };
+  }
+
+  try {
+    const cache = JSON.parse(cacheStr);
+    // Clean up expired entries periodically (once per day)
+    const oneDay = 24 * 60 * 60 * 1000;
+    if (!cache.lastCleanup || Date.now() - cache.lastCleanup > oneDay) {
+      return cleanupSecurityCache(cache);
+    }
+    return cache;
+  } catch (e) {
+    Logger.log('Error parsing security cache: ' + e.message);
+    return { scanned: {}, threats: [], lastCleanup: Date.now() };
+  }
+}
+
+/**
+ * Save the security scan cache
+ * @param {Object} cache - Cache object to save
+ */
+function saveSecurityScanCache(cache) {
+  const props = PropertiesService.getUserProperties();
+  try {
+    // Limit cache size to avoid quota issues
+    const cacheStr = JSON.stringify(cache);
+    if (cacheStr.length > 50000) {
+      // If too large, keep only recent threats and clear old scanned entries
+      cache = cleanupSecurityCache(cache, true);
+    }
+    props.setProperty(SECURITY_SCAN_CACHE_KEY, JSON.stringify(cache));
+  } catch (e) {
+    Logger.log('Error saving security cache: ' + e.message);
+  }
+}
+
+/**
+ * Clean up expired cache entries
+ * @param {Object} cache - Cache object
+ * @param {boolean} aggressive - If true, be more aggressive about cleanup
+ * @returns {Object} Cleaned cache
+ */
+function cleanupSecurityCache(cache, aggressive) {
+  const expiryTime = SECURITY_CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const cutoff = now - expiryTime;
+
+  // Clean up old scanned entries
+  const newScanned = {};
+  let count = 0;
+  const maxEntries = aggressive ? 200 : 500;
+
+  // Sort by timestamp descending and keep most recent
+  const entries = Object.entries(cache.scanned || {})
+    .filter(function(entry) { return entry[1].timestamp > cutoff; })
+    .sort(function(a, b) { return b[1].timestamp - a[1].timestamp; });
+
+  entries.forEach(function(entry) {
+    if (count < maxEntries) {
+      newScanned[entry[0]] = entry[1];
+      count++;
+    }
+  });
+
+  // Clean up old threats (keep threats longer)
+  const threatCutoff = now - (expiryTime * 2); // Keep threats 2x longer
+  const newThreats = (cache.threats || []).filter(function(threat) {
+    return threat.timestamp > threatCutoff;
+  });
+
+  return {
+    scanned: newScanned,
+    threats: newThreats,
+    lastCleanup: now
+  };
+}
+
+/**
+ * Clear the security scan cache
+ */
+function clearSecurityScanCache() {
+  const props = PropertiesService.getUserProperties();
+  props.deleteProperty(SECURITY_SCAN_CACHE_KEY);
+  Logger.log('Security scan cache cleared');
+}
+
+/**
+ * Batch scan recent emails for threats (with caching)
+ * @param {number} count - Number of NEW emails to scan
+ * @returns {Object} Batch scan results including cached threats
  */
 function batchSecurityScan(count) {
   count = Math.min(count || 10, 50); // Cap at 50 for timeout safety
-  const threads = GmailApp.getInboxThreads(0, count);
+
+  // Load cache
+  const cache = getSecurityScanCache();
+  const scannedIds = cache.scanned || {};
+
+  // Get more threads than requested to find unscanned ones
+  const fetchCount = Math.min(count * 3, 150); // Fetch 3x to find new messages
+  const threads = GmailApp.getInboxThreads(0, fetchCount);
+
   const results = {
     scanned: 0,
+    newScanned: 0,
+    fromCache: 0,
     threats: [],
     safe: 0,
     errors: 0,
@@ -531,12 +644,34 @@ function batchSecurityScan(count) {
   };
 
   const startTime = Date.now();
-  const MAX_TIME = 5 * 60 * 1000; // 5 minutes max (leave 1 min buffer)
+  const MAX_TIME = 5 * 60 * 1000; // 5 minutes max
+
+  // First, add cached threats to results
+  (cache.threats || []).forEach(function(threat) {
+    // Check if the message still exists and is still in inbox
+    try {
+      const msg = GmailApp.getMessageById(threat.messageId);
+      if (msg && msg.getThread().isInInbox()) {
+        results.threats.push(threat);
+        results.fromCache++;
+      }
+    } catch (e) {
+      // Message no longer exists, skip it
+    }
+  });
+
+  // Track new threats to add to cache
+  const newThreats = [];
 
   for (let i = 0; i < threads.length; i++) {
+    // Stop if we've scanned enough new messages
+    if (results.newScanned >= count) {
+      break;
+    }
+
     // Timeout protection
     if (Date.now() - startTime > MAX_TIME) {
-      Logger.log('Batch scan timeout: processed ' + results.scanned + ' of ' + threads.length);
+      Logger.log('Batch scan timeout: processed ' + results.newScanned + ' new messages');
       results.timedOut = true;
       break;
     }
@@ -544,28 +679,50 @@ function batchSecurityScan(count) {
     const thread = threads[i];
     try {
       const message = thread.getMessages()[0];
+      const messageId = message.getId();
       const from = message.getFrom();
+
+      // Check if already scanned (in cache)
+      if (scannedIds[messageId]) {
+        results.scanned++;
+        // If it was a threat, it's already in results from cache
+        if (scannedIds[messageId].safe) {
+          results.safe++;
+        }
+        continue;
+      }
 
       // Skip whitelisted senders
       if (isSenderWhitelisted(from)) {
         results.safe++;
+        // Cache as safe
+        scannedIds[messageId] = { safe: true, timestamp: Date.now() };
         continue;
       }
 
-      // Run quick check first
+      // Run quick check (this is new work)
       const quickResult = quickSecurityCheck(message);
       results.scanned++;
+      results.newScanned++;
 
       if (quickResult.threatLevel !== THREAT_LEVEL.SAFE) {
-        results.threats.push({
-          messageId: message.getId(),
+        const threat = {
+          messageId: messageId,
           subject: message.getSubject(),
           from: from,
           threatLevel: quickResult.threatLevel,
-          redFlags: quickResult.redFlags
-        });
+          redFlags: quickResult.redFlags,
+          timestamp: Date.now()
+        };
+        results.threats.push(threat);
+        newThreats.push(threat);
+
+        // Cache as threat
+        scannedIds[messageId] = { safe: false, timestamp: Date.now() };
       } else {
         results.safe++;
+        // Cache as safe
+        scannedIds[messageId] = { safe: true, timestamp: Date.now() };
       }
 
     } catch (e) {
@@ -573,6 +730,11 @@ function batchSecurityScan(count) {
       Logger.log('Batch scan error: ' + e.message);
     }
   }
+
+  // Update cache with new results
+  cache.scanned = scannedIds;
+  cache.threats = [...(cache.threats || []), ...newThreats];
+  saveSecurityScanCache(cache);
 
   trackFeatureUsage('batch_security_scan');
 

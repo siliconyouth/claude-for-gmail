@@ -3175,20 +3175,50 @@ function buildScanCountSelectionCard() {
 
   card.addSection(section);
 
-  // Back button
-  const backSection = CardService.newCardSection();
+  // Options section
+  const optionsSection = CardService.newCardSection()
+    .setHeader('Options')
+    .setCollapsible(true);
+
+  const clearCacheAction = CardService.newAction()
+    .setFunctionName('onClearSecurityCache')
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  optionsSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Clear Scan Cache')
+      .setBottomLabel('Re-scan all messages fresh')
+      .setOnClickAction(clearCacheAction)
+  );
+
   const backAction = CardService.newAction()
     .setFunctionName('onBackToHome');
 
-  backSection.addWidget(
+  optionsSection.addWidget(
     CardService.newTextButton()
       .setText('Cancel')
       .setOnClickAction(backAction)
   );
 
-  card.addSection(backSection);
+  card.addSection(optionsSection);
 
   return card.build();
+}
+
+/**
+ * Clear security scan cache handler
+ */
+function onClearSecurityCache(e) {
+  try {
+    clearSecurityScanCache();
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Cache cleared. Next scan will analyze all messages fresh.'))
+      .build();
+  } catch (error) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
 }
 
 /**
@@ -3220,9 +3250,12 @@ function onBulkSecurityScanExecute(e) {
 function buildBulkScanResultsCard(results) {
   const card = CardService.newCardBuilder();
 
+  const newScanned = results.newScanned || results.scanned;
+  const fromCache = results.fromCache || 0;
+
   card.setHeader(CardService.newCardHeader()
     .setTitle('Security Scan Results')
-    .setSubtitle(results.scanned + ' emails scanned'));
+    .setSubtitle(newScanned + ' new emails scanned'));
 
   // Summary section
   const summarySection = CardService.newCardSection()
@@ -3230,9 +3263,19 @@ function buildBulkScanResultsCard(results) {
 
   summarySection.addWidget(
     CardService.newDecoratedText()
-      .setText('Scanned: ' + results.scanned)
+      .setText('New Scans: ' + newScanned)
+      .setBottomLabel('Fresh analysis performed')
       .setWrapText(true)
   );
+
+  if (fromCache > 0) {
+    summarySection.addWidget(
+      CardService.newDecoratedText()
+        .setText('From Cache: ' + fromCache + ' threats')
+        .setBottomLabel('Previously detected, still in inbox')
+        .setWrapText(true)
+    );
+  }
 
   summarySection.addWidget(
     CardService.newDecoratedText()
@@ -3242,7 +3285,8 @@ function buildBulkScanResultsCard(results) {
 
   summarySection.addWidget(
     CardService.newDecoratedText()
-      .setText('Threats Found: ' + results.threats.length)
+      .setText('Total Threats: ' + results.threats.length)
+      .setBottomLabel(fromCache > 0 ? (results.threats.length - fromCache) + ' new + ' + fromCache + ' cached' : '')
       .setWrapText(true)
   );
 
