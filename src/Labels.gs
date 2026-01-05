@@ -3,22 +3,27 @@
  * Automatically categorizes emails using Claude AI
  */
 
-// Default label categories
+// Gmail label color constants
+// Using black background (#000000) with white text (#ffffff) for all AI labels
+const AI_LABEL_BACKGROUND = '#000000';
+const AI_LABEL_TEXT = '#ffffff';
+
+// Default label categories - all with black/white theme
 const LABEL_CATEGORIES = {
-  'AI/Priority/High': { color: '#cc3a21', description: 'Urgent or time-sensitive' },
-  'AI/Priority/Medium': { color: '#f2a600', description: 'Normal priority' },
-  'AI/Priority/Low': { color: '#149e60', description: 'Low priority or FYI' },
-  'AI/Category/Meeting': { color: '#4986e7', description: 'Meeting requests and calendar' },
-  'AI/Category/Request': { color: '#a479e2', description: 'Action required from you' },
-  'AI/Category/Info': { color: '#98d7e4', description: 'Informational, no action needed' },
-  'AI/Category/Sales': { color: '#ff7537', description: 'Sales and marketing emails' },
-  'AI/Category/Support': { color: '#ffad47', description: 'Support and help requests' },
-  'AI/Category/Newsletter': { color: '#b3dc6c', description: 'Newsletters and subscriptions' },
-  'AI/Category/Personal': { color: '#f691b3', description: 'Personal correspondence' },
-  'AI/Category/Finance': { color: '#16a766', description: 'Financial and billing' },
-  'AI/Status/NeedsReply': { color: '#fb4c2f', description: 'Waiting for your response' },
-  'AI/Status/WaitingOn': { color: '#ffc8af', description: 'Waiting on someone else' },
-  'AI/Status/FYI': { color: '#c9daf8', description: 'No action required' }
+  'AI/Priority/High': { description: 'Urgent or time-sensitive' },
+  'AI/Priority/Medium': { description: 'Normal priority' },
+  'AI/Priority/Low': { description: 'Low priority or FYI' },
+  'AI/Category/Meeting': { description: 'Meeting requests and calendar' },
+  'AI/Category/Request': { description: 'Action required from you' },
+  'AI/Category/Info': { description: 'Informational, no action needed' },
+  'AI/Category/Sales': { description: 'Sales and marketing emails' },
+  'AI/Category/Support': { description: 'Support and help requests' },
+  'AI/Category/Newsletter': { description: 'Newsletters and subscriptions' },
+  'AI/Category/Personal': { description: 'Personal correspondence' },
+  'AI/Category/Finance': { description: 'Financial and billing' },
+  'AI/Status/NeedsReply': { description: 'Waiting for your response' },
+  'AI/Status/WaitingOn': { description: 'Waiting on someone else' },
+  'AI/Status/FYI': { description: 'No action required' }
 };
 
 /**
@@ -34,7 +39,8 @@ function initializeLabels() {
 }
 
 /**
- * Get or create a Gmail label
+ * Get or create a Gmail label with black/white styling
+ * Uses Gmail Advanced Service for color support
  * @param {string} labelName - Full label name (e.g., "AI/Category/Meeting")
  * @returns {GmailLabel} The Gmail label
  */
@@ -42,11 +48,67 @@ function getOrCreateLabel(labelName) {
   let label = GmailApp.getUserLabelByName(labelName);
 
   if (!label) {
+    // Create label using standard API first
     label = GmailApp.createLabel(labelName);
     Logger.log('Created label: ' + labelName);
+
+    // Now update the color using Gmail Advanced Service
+    try {
+      setLabelColor(labelName);
+    } catch (e) {
+      Logger.log('Could not set label color: ' + e.message);
+    }
   }
 
   return label;
+}
+
+/**
+ * Set label color to black background with white text
+ * Uses Gmail Advanced Service
+ * @param {string} labelName - The label name
+ */
+function setLabelColor(labelName) {
+  // Get all labels to find the ID
+  const labels = Gmail.Users.Labels.list('me').labels;
+  const targetLabel = labels.find(function(l) {
+    return l.name === labelName;
+  });
+
+  if (!targetLabel) {
+    Logger.log('Label not found: ' + labelName);
+    return;
+  }
+
+  // Update label with color
+  // Gmail uses a specific color palette, closest to black is #000000
+  const labelUpdate = {
+    color: {
+      backgroundColor: AI_LABEL_BACKGROUND,
+      textColor: AI_LABEL_TEXT
+    }
+  };
+
+  Gmail.Users.Labels.update(labelUpdate, 'me', targetLabel.id);
+  Logger.log('Set color for label: ' + labelName);
+}
+
+/**
+ * Update all existing AI labels to black/white theme
+ * Run this once to update existing labels
+ */
+function updateAllLabelColors() {
+  Object.keys(LABEL_CATEGORIES).forEach(function(labelName) {
+    try {
+      const label = GmailApp.getUserLabelByName(labelName);
+      if (label) {
+        setLabelColor(labelName);
+      }
+    } catch (e) {
+      Logger.log('Error updating ' + labelName + ': ' + e.message);
+    }
+  });
+  Logger.log('All AI label colors updated to black/white theme');
 }
 
 /**
