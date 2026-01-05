@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <!-- Square background with rounded corners -->
-  <rect x="4" y="4" width="120" height="120" rx="20" ry="20" fill="#8b5cf6"/>
+  <!-- Circle background -->
+  <circle cx="64" cy="64" r="60" fill="#000000"/>
 
   <!-- @ symbol in Inter font -->
   <text x="64" y="92"
