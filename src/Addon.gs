@@ -884,66 +884,84 @@ function getSentimentIcon(sentiment) {
 // ============================================================================
 
 /**
- * Check if digest trigger is enabled
+ * Check if digest is enabled (uses unified scheduler)
  * @returns {boolean}
  */
 function isDigestEnabled() {
-  const triggers = ScriptApp.getProjectTriggers();
-  return triggers.some(t => t.getHandlerFunction() === 'sendDailyDigest');
+  return getPreference(PREF_DIGEST_ENABLED, false);
 }
 
 /**
- * Check if auto-label trigger is enabled
+ * Check if auto-label is enabled (uses unified scheduler)
  * @returns {boolean}
  */
 function isAutoLabelEnabled() {
-  const triggers = ScriptApp.getProjectTriggers();
-  return triggers.some(t => t.getHandlerFunction() === 'autoLabelUnreadEmails');
+  return getPreference(PREF_AUTO_LABEL_ENABLED, false);
 }
 
 /**
- * Toggle daily digest
+ * Toggle daily digest (uses unified scheduler)
  * @param {Object} e - Event object
  * @returns {ActionResponse}
  */
 function onToggleDigest(e) {
-  const enabled = e.formInputs?.digestEnabled?.[0] === 'true';
+  try {
+    const enabled = e.formInputs?.digestEnabled?.[0] === 'true';
 
-  if (enabled) {
-    setupDigestTrigger();
-  } else {
-    removeDigestTrigger();
+    if (enabled) {
+      enableDigest(8); // 8 AM default
+    } else {
+      disableDigest();
+    }
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText(enabled ? 'Daily digest enabled (8 AM)' : 'Daily digest disabled')
+      )
+      .build();
+  } catch (error) {
+    logError('onToggleDigest', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText('Error: ' + parseError(error).message)
+      )
+      .build();
   }
-
-  return CardService.newActionResponseBuilder()
-    .setNotification(
-      CardService.newNotification()
-        .setText(enabled ? 'Daily digest enabled' : 'Daily digest disabled')
-    )
-    .build();
 }
 
 /**
- * Toggle auto-labeling
+ * Toggle auto-labeling (uses unified scheduler)
  * @param {Object} e - Event object
  * @returns {ActionResponse}
  */
 function onToggleAutoLabel(e) {
-  const enabled = e.formInputs?.autoLabelEnabled?.[0] === 'true';
+  try {
+    const enabled = e.formInputs?.autoLabelEnabled?.[0] === 'true';
 
-  if (enabled) {
-    initializeLabels();
-    setupAutoLabelTrigger();
-  } else {
-    removeAutoLabelTrigger();
+    if (enabled) {
+      initializeLabels();
+      enableAutoLabel();
+    } else {
+      disableAutoLabel();
+    }
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText(enabled ? 'Auto-labeling enabled (hourly)' : 'Auto-labeling disabled')
+      )
+      .build();
+  } catch (error) {
+    logError('onToggleAutoLabel', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText('Error: ' + parseError(error).message)
+      )
+      .build();
   }
-
-  return CardService.newActionResponseBuilder()
-    .setNotification(
-      CardService.newNotification()
-        .setText(enabled ? 'Auto-labeling enabled' : 'Auto-labeling disabled')
-    )
-    .build();
 }
 
 /**
