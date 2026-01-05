@@ -101,27 +101,26 @@ function buildHomepageCard() {
   const statusSection = CardService.newCardSection()
     .setHeader('Status');
 
+  let apiKeyStatus = 'Not Set';
+  let apiKeyOk = false;
+
   try {
-    const apiKey = getApiKey();
-    // Verify key exists and has reasonable length
+    // Direct access to avoid any wrapper issues
+    const props = PropertiesService.getScriptProperties();
+    const apiKey = props.getProperty('CLAUDE_API_KEY');
     if (apiKey && apiKey.length > 10) {
-      statusSection.addWidget(
-        CardService.newDecoratedText()
-          .setText('API Connected')
-          .setBottomLabel('Key: ' + apiKey.substring(0, 8) + '...')
-          .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CONFIRM))
-      );
-    } else {
-      throw new Error('Invalid key format');
+      apiKeyStatus = 'Connected';
+      apiKeyOk = true;
     }
   } catch (error) {
-    statusSection.addWidget(
-      CardService.newDecoratedText()
-        .setText('API Key Not Set')
-        .setBottomLabel('Error: ' + (error.message || 'Unknown'))
-        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.NONE))
-    );
+    // Log for debugging
+    Logger.log('API key check error: ' + error.message);
   }
+
+  statusSection.addWidget(
+    CardService.newTextParagraph()
+      .setText(apiKeyOk ? '✅ API: ' + apiKeyStatus : '❌ API Key Not Set\nGo to Project Settings → Script Properties')
+  );
 
   // Automation section
   const automationSection = CardService.newCardSection()
