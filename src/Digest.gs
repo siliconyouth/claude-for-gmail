@@ -23,36 +23,51 @@ function sendDailyDigest() {
 
 /**
  * Get emails for the digest (unread from last 24 hours, prioritized)
+ * Optimized: limits to 8 emails, uses caching, has timeout protection
  * @returns {Object[]} Array of email objects with metadata and analysis
  */
 function getDigestEmails() {
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-  // Search for unread emails from the last 24 hours
+  // Search for unread emails from the last 24 hours (limit to 8 for performance)
   const query = `is:unread after:${formatDateForSearch(oneDayAgo)}`;
-  const threads = GmailApp.search(query, 0, 20);
+  const threads = GmailApp.search(query, 0, 8);
 
   const emails = [];
+  const startTime = Date.now();
+  const MAX_TIME = 4 * 60 * 1000; // 4 minutes max (leave buffer for sending)
 
-  threads.forEach(function(thread) {
+  for (let i = 0; i < threads.length; i++) {
+    // Check if we're running out of time
+    if (Date.now() - startTime > MAX_TIME) {
+      Logger.log('Digest timeout protection: processed ' + emails.length + ' emails');
+      break;
+    }
+
+    const thread = threads[i];
     const messages = thread.getMessages();
     const latestMessage = messages[messages.length - 1];
 
     try {
+      const messageId = latestMessage.getId();
       const body = getEmailBody(latestMessage);
       const metadata = getEmailMetadata(latestMessage);
-      const analysis = analyzeEmail(body);
+
+      // Use cached analysis if available, otherwise analyze
+      const analysis = analyzeEmail(body, messageId);
 
       emails.push({
         metadata: metadata,
         analysis: analysis,
         threadLength: messages.length
       });
+
+      Logger.log('Digest: processed ' + (i + 1) + '/' + threads.length);
     } catch (error) {
       Logger.log('Error analyzing email for digest: ' + error.message);
     }
-  });
+  }
 
   // Sort by priority (high first)
   emails.sort(function(a, b) {
