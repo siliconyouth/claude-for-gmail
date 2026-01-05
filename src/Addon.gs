@@ -122,7 +122,7 @@ function buildHomepageCard() {
 
   const statusWidget = CardService.newDecoratedText()
     .setText(apiKeyOk ? 'API: ' + apiKeyStatus : 'API Key Not Set')
-    .setStartIcon(CardService.newIconImage().setIcon(apiKeyOk ? CardService.Icon.CONFIRM : CardService.Icon.NONE));
+    .setStartIcon(CardService.newIconImage().setIcon(apiKeyOk ? CardService.Icon.CONFIRM : CardService.Icon.STAR));
 
   if (!apiKeyOk) {
     statusWidget.setBottomLabel('Go to Project Settings → Script Properties');
@@ -893,9 +893,9 @@ function getPriorityIcon(priority) {
     case 'medium':
       return CardService.Icon.BOOKMARK;
     case 'low':
-      return CardService.Icon.NONE;
+      return CardService.Icon.DESCRIPTION;
     default:
-      return CardService.Icon.NONE;
+      return CardService.Icon.DESCRIPTION;
   }
 }
 
@@ -909,7 +909,7 @@ function getSentimentIcon(sentiment) {
     case 'positive':
       return CardService.Icon.CONFIRM;
     case 'negative':
-      return CardService.Icon.NONE;
+      return CardService.Icon.STAR;
     case 'neutral':
       return CardService.Icon.DESCRIPTION;
     default:
