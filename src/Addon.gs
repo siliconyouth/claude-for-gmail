@@ -120,12 +120,15 @@ function buildHomepageCard() {
     Logger.log('API key check error: ' + error.message);
   }
 
-  statusSection.addWidget(
-    CardService.newDecoratedText()
-      .setText(apiKeyOk ? 'API: ' + apiKeyStatus : 'API Key Not Set')
-      .setBottomLabel(apiKeyOk ? '' : 'Go to Project Settings → Script Properties')
-      .setStartIcon(CardService.newIconImage().setIcon(apiKeyOk ? CardService.Icon.CONFIRM : CardService.Icon.NONE))
-  );
+  const statusWidget = CardService.newDecoratedText()
+    .setText(apiKeyOk ? 'API: ' + apiKeyStatus : 'API Key Not Set')
+    .setStartIcon(CardService.newIconImage().setIcon(apiKeyOk ? CardService.Icon.CONFIRM : CardService.Icon.NONE));
+
+  if (!apiKeyOk) {
+    statusWidget.setBottomLabel('Go to Project Settings → Script Properties');
+  }
+
+  statusSection.addWidget(statusWidget);
 
   // Settings button
   const settingsAction = CardService.newAction()
