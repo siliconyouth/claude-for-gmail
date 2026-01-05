@@ -280,9 +280,71 @@ function buildEmailActionCard(messageId) {
 
   card.addSection(actionsSection);
 
+  // Advanced Features section
+  const advancedSection = CardService.newCardSection()
+    .setHeader('Advanced');
+
+  // Thread Analysis
+  const threadAction = CardService.newAction()
+    .setFunctionName('onAnalyzeThread')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  advancedSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Analyze Thread')
+      .setBottomLabel('Summarize entire conversation')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.EMAIL))
+      .setOnClickAction(threadAction)
+  );
+
+  // Language & Translation
+  const languageAction = CardService.newAction()
+    .setFunctionName('onShowLanguageOptions')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  advancedSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Translate')
+      .setBottomLabel('Detect language, translate email')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.PERSON))
+      .setOnClickAction(languageAction)
+  );
+
+  // Follow-up Detection
+  const followUpAction = CardService.newAction()
+    .setFunctionName('onAnalyzeFollowUp')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  advancedSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Follow-up Check')
+      .setBottomLabel('Does this need a response?')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CLOCK))
+      .setOnClickAction(followUpAction)
+  );
+
+  // Meeting Detection
+  const meetingAction = CardService.newAction()
+    .setFunctionName('onDetectMeeting')
+    .setParameters({ messageId: messageId })
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  advancedSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Detect Meeting')
+      .setBottomLabel('Extract event details')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.INVITE))
+      .setOnClickAction(meetingAction)
+  );
+
+  card.addSection(advancedSection);
+
   // Templates section
   const templatesSection = CardService.newCardSection()
-    .setHeader('Quick Templates');
+    .setHeader('More');
 
   const templateAction = CardService.newAction()
     .setFunctionName('onShowTemplates')
@@ -1333,4 +1395,598 @@ function onSaveSettings(e) {
       )
       .build();
   }
+}
+
+// ============================================================================
+// ADVANCED FEATURE HANDLERS
+// ============================================================================
+
+/**
+ * Handle Thread Analysis button
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onAnalyzeThread(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const message = validateAndGetMessage(messageId);
+    const result = analyzeThread(message);
+    const card = buildThreadAnalysisCard(result, messageId);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    logError('onAnalyzeThread', error);
+    const errorCard = buildErrorCard('Thread Analysis Failed', parseError(error).message);
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(errorCard))
+      .build();
+  }
+}
+
+/**
+ * Build thread analysis result card
+ * @param {Object} result - Thread analysis result
+ * @param {string} messageId - Message ID
+ * @returns {Card}
+ */
+function buildThreadAnalysisCard(result, messageId) {
+  const card = CardService.newCardBuilder();
+
+  card.setHeader(
+    CardService.newCardHeader()
+      .setTitle('Thread Analysis')
+      .setSubtitle(result.messageCount + ' messages')
+      .setImageStyle(CardService.ImageStyle.CIRCLE)
+      .setImageUrl(LOGO_URL)
+  );
+
+  // Summary section
+  const summarySection = CardService.newCardSection()
+    .setHeader('Summary')
+    .addWidget(
+      CardService.newTextParagraph()
+        .setText(result.summary)
+    );
+
+  // Status badge
+  summarySection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Status: ' + (result.status || 'unknown').replace('_', ' '))
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+  );
+
+  if (result.tone) {
+    summarySection.addWidget(
+      CardService.newDecoratedText()
+        .setText('Tone: ' + result.tone)
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR))
+    );
+  }
+
+  card.addSection(summarySection);
+
+  // Decisions section
+  if (result.decisions && result.decisions.length > 0) {
+    const decisionsSection = CardService.newCardSection()
+      .setHeader('Decisions Made');
+
+    result.decisions.forEach(function(decision) {
+      decisionsSection.addWidget(
+        CardService.newDecoratedText()
+          .setText(decision)
+          .setWrapText(true)
+          .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR))
+      );
+    });
+
+    card.addSection(decisionsSection);
+  }
+
+  // Open questions section
+  if (result.openQuestions && result.openQuestions.length > 0) {
+    const questionsSection = CardService.newCardSection()
+      .setHeader('Open Questions');
+
+    result.openQuestions.forEach(function(question) {
+      questionsSection.addWidget(
+        CardService.newDecoratedText()
+          .setText(question)
+          .setWrapText(true)
+          .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.DESCRIPTION))
+      );
+    });
+
+    card.addSection(questionsSection);
+  }
+
+  // Next steps section
+  if (result.nextSteps && result.nextSteps.length > 0) {
+    const stepsSection = CardService.newCardSection()
+      .setHeader('Next Steps');
+
+    result.nextSteps.forEach(function(step) {
+      stepsSection.addWidget(
+        CardService.newDecoratedText()
+          .setText(step)
+          .setWrapText(true)
+          .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.INVITE))
+      );
+    });
+
+    card.addSection(stepsSection);
+  }
+
+  // Draft reply button
+  const buttonSection = CardService.newCardSection();
+
+  const draftAction = CardService.newAction()
+    .setFunctionName('onDraftReplyStart')
+    .setParameters({ messageId: messageId });
+
+  buttonSection.addWidget(
+    CardService.newTextButton()
+      .setText('Draft Reply')
+      .setOnClickAction(draftAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+  );
+
+  card.addSection(buttonSection);
+
+  return card.build();
+}
+
+/**
+ * Show language options card
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onShowLanguageOptions(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const message = validateAndGetMessage(messageId);
+    const body = getEmailBody(message);
+    const detected = detectLanguage(body);
+    const card = buildLanguageOptionsCard(detected, messageId);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    logError('onShowLanguageOptions', error);
+    const errorCard = buildErrorCard('Language Detection Failed', parseError(error).message);
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(errorCard))
+      .build();
+  }
+}
+
+/**
+ * Build language options card
+ * @param {Object} detected - Detected language info
+ * @param {string} messageId - Message ID
+ * @returns {Card}
+ */
+function buildLanguageOptionsCard(detected, messageId) {
+  const card = CardService.newCardBuilder();
+
+  card.setHeader(
+    CardService.newCardHeader()
+      .setTitle('Language & Translation')
+      .setSubtitle('Detected: ' + detected.languageName)
+      .setImageStyle(CardService.ImageStyle.CIRCLE)
+      .setImageUrl(LOGO_URL)
+  );
+
+  // Detection result
+  const detectionSection = CardService.newCardSection()
+    .setHeader('Detected Language');
+
+  detectionSection.addWidget(
+    CardService.newDecoratedText()
+      .setText(detected.languageName + ' (' + detected.language + ')')
+      .setBottomLabel('Confidence: ' + detected.confidence)
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.PERSON))
+  );
+
+  card.addSection(detectionSection);
+
+  // Translation options
+  const translateSection = CardService.newCardSection()
+    .setHeader('Translate To');
+
+  const languages = [
+    { code: 'en', name: 'English' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'fr', name: 'French' },
+    { code: 'de', name: 'German' },
+    { code: 'zh', name: 'Chinese' },
+    { code: 'ja', name: 'Japanese' }
+  ];
+
+  languages.forEach(function(lang) {
+    if (lang.code !== detected.language) {
+      const action = CardService.newAction()
+        .setFunctionName('onTranslateEmail')
+        .setParameters({ messageId: messageId, targetLanguage: lang.code })
+        .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+      translateSection.addWidget(
+        CardService.newDecoratedText()
+          .setText(lang.name)
+          .setOnClickAction(action)
+          .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+      );
+    }
+  });
+
+  card.addSection(translateSection);
+
+  // Reply in language
+  const replySection = CardService.newCardSection()
+    .setHeader('Reply In');
+
+  languages.forEach(function(lang) {
+    const action = CardService.newAction()
+      .setFunctionName('onReplyInLanguage')
+      .setParameters({ messageId: messageId, language: lang.code })
+      .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+    replySection.addWidget(
+      CardService.newDecoratedText()
+        .setText('Reply in ' + lang.name)
+        .setOnClickAction(action)
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.EMAIL))
+    );
+  });
+
+  card.addSection(replySection);
+
+  return card.build();
+}
+
+/**
+ * Handle email translation
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onTranslateEmail(e) {
+  const messageId = e.parameters.messageId;
+  const targetLanguage = e.parameters.targetLanguage;
+
+  try {
+    const message = validateAndGetMessage(messageId);
+    const body = getEmailBody(message);
+    const result = translateEmail(body, targetLanguage);
+    const card = buildTranslationResultCard(result, messageId);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    logError('onTranslateEmail', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText('Translation failed: ' + error.message)
+      )
+      .build();
+  }
+}
+
+/**
+ * Build translation result card
+ * @param {Object} result - Translation result
+ * @param {string} messageId - Message ID
+ * @returns {Card}
+ */
+function buildTranslationResultCard(result, messageId) {
+  const card = CardService.newCardBuilder();
+
+  card.setHeader(
+    CardService.newCardHeader()
+      .setTitle('Translation')
+      .setSubtitle('From: ' + result.sourceLanguage)
+  );
+
+  const section = CardService.newCardSection()
+    .addWidget(
+      CardService.newTextParagraph()
+        .setText(result.translatedText)
+    );
+
+  if (result.notes) {
+    section.addWidget(
+      CardService.newTextParagraph()
+        .setText('Note: ' + result.notes)
+    );
+  }
+
+  card.addSection(section);
+
+  return card.build();
+}
+
+/**
+ * Handle reply in specific language
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onReplyInLanguage(e) {
+  const messageId = e.parameters.messageId;
+  const language = e.parameters.language;
+
+  try {
+    const message = validateAndGetMessage(messageId);
+    const body = getEmailBody(message);
+    const replyText = generateReplyInLanguage(body, '', language);
+    const draft = createReplyDraft(message, replyText);
+
+    const card = buildDraftResultCard(replyText, draft.getId(), messageId);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    logError('onReplyInLanguage', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(
+        CardService.newNotification()
+          .setText('Reply generation failed: ' + error.message)
+      )
+      .build();
+  }
+}
+
+/**
+ * Handle Follow-up Analysis
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onAnalyzeFollowUp(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const message = validateAndGetMessage(messageId);
+    const body = getEmailBody(message);
+    const result = analyzeFollowUp(body, messageId);
+    const card = buildFollowUpCard(result, messageId);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    logError('onAnalyzeFollowUp', error);
+    const errorCard = buildErrorCard('Follow-up Analysis Failed', parseError(error).message);
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(errorCard))
+      .build();
+  }
+}
+
+/**
+ * Build follow-up analysis card
+ * @param {Object} result - Follow-up analysis result
+ * @param {string} messageId - Message ID
+ * @returns {Card}
+ */
+function buildFollowUpCard(result, messageId) {
+  const card = CardService.newCardBuilder();
+
+  const needsFollowUp = result.needsFollowUp ? 'Yes' : 'No';
+
+  card.setHeader(
+    CardService.newCardHeader()
+      .setTitle('Follow-up Analysis')
+      .setSubtitle('Needs follow-up: ' + needsFollowUp)
+      .setImageStyle(CardService.ImageStyle.CIRCLE)
+      .setImageUrl(LOGO_URL)
+  );
+
+  const section = CardService.newCardSection();
+
+  section.addWidget(
+    CardService.newDecoratedText()
+      .setText('Urgency: ' + (result.urgency || 'none').toUpperCase())
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CLOCK))
+  );
+
+  section.addWidget(
+    CardService.newDecoratedText()
+      .setText('Timeframe: ' + result.suggestedTimeframe)
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.INVITE))
+  );
+
+  section.addWidget(
+    CardService.newDecoratedText()
+      .setText('Type: ' + (result.followUpType || 'unknown').replace('_', ' '))
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+  );
+
+  section.addWidget(
+    CardService.newTextParagraph()
+      .setText(result.reason)
+  );
+
+  card.addSection(section);
+
+  // Draft reply button if follow-up needed
+  if (result.needsFollowUp) {
+    const buttonSection = CardService.newCardSection();
+
+    const draftAction = CardService.newAction()
+      .setFunctionName('onDraftReplyStart')
+      .setParameters({ messageId: messageId });
+
+    buttonSection.addWidget(
+      CardService.newTextButton()
+        .setText('Draft Follow-up Reply')
+        .setOnClickAction(draftAction)
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    );
+
+    card.addSection(buttonSection);
+  }
+
+  return card.build();
+}
+
+/**
+ * Handle Meeting Detection
+ * @param {Object} e - Event object
+ * @returns {ActionResponse}
+ */
+function onDetectMeeting(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const message = validateAndGetMessage(messageId);
+    const body = getEmailBody(message);
+    const result = detectMeeting(body, messageId);
+    const card = buildMeetingCard(result, messageId);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    logError('onDetectMeeting', error);
+    const errorCard = buildErrorCard('Meeting Detection Failed', parseError(error).message);
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(errorCard))
+      .build();
+  }
+}
+
+/**
+ * Build meeting detection result card
+ * @param {Object} result - Meeting detection result
+ * @param {string} messageId - Message ID
+ * @returns {Card}
+ */
+function buildMeetingCard(result, messageId) {
+  const card = CardService.newCardBuilder();
+
+  const hasMeeting = result.hasMeeting ? 'Yes' : 'No';
+
+  card.setHeader(
+    CardService.newCardHeader()
+      .setTitle('Meeting Detection')
+      .setSubtitle('Meeting found: ' + hasMeeting)
+      .setImageStyle(CardService.ImageStyle.CIRCLE)
+      .setImageUrl(LOGO_URL)
+  );
+
+  if (!result.hasMeeting) {
+    const section = CardService.newCardSection()
+      .addWidget(
+        CardService.newTextParagraph()
+          .setText('No meeting or event detected in this email.')
+      );
+    card.addSection(section);
+    return card.build();
+  }
+
+  // Meeting details section
+  const detailsSection = CardService.newCardSection()
+    .setHeader('Event Details');
+
+  if (result.title) {
+    detailsSection.addWidget(
+      CardService.newDecoratedText()
+        .setText(result.title)
+        .setBottomLabel('Event Title')
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR))
+    );
+  }
+
+  if (result.meetingType) {
+    detailsSection.addWidget(
+      CardService.newDecoratedText()
+        .setText(result.meetingType.replace('_', ' '))
+        .setBottomLabel('Type')
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+    );
+  }
+
+  if (result.proposedDates && result.proposedDates.length > 0) {
+    result.proposedDates.forEach(function(date) {
+      detailsSection.addWidget(
+        CardService.newDecoratedText()
+          .setText(date)
+          .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CLOCK))
+      );
+    });
+  }
+
+  if (result.duration) {
+    detailsSection.addWidget(
+      CardService.newDecoratedText()
+        .setText(result.duration)
+        .setBottomLabel('Duration')
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.INVITE))
+    );
+  }
+
+  if (result.location) {
+    detailsSection.addWidget(
+      CardService.newDecoratedText()
+        .setText(result.location)
+        .setBottomLabel('Location')
+        .setWrapText(true)
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.DESCRIPTION))
+    );
+  }
+
+  card.addSection(detailsSection);
+
+  // Attendees section
+  if (result.attendees && result.attendees.length > 0) {
+    const attendeesSection = CardService.newCardSection()
+      .setHeader('Attendees');
+
+    result.attendees.forEach(function(attendee) {
+      attendeesSection.addWidget(
+        CardService.newDecoratedText()
+          .setText(attendee)
+          .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.PERSON))
+      );
+    });
+
+    card.addSection(attendeesSection);
+  }
+
+  // Status
+  const statusSection = CardService.newCardSection();
+
+  statusSection.addWidget(
+    CardService.newDecoratedText()
+      .setText(result.isConfirmed ? 'Confirmed' : 'Proposed / Tentative')
+      .setBottomLabel('Status')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR))
+  );
+
+  // Draft reply button
+  const draftAction = CardService.newAction()
+    .setFunctionName('onDraftReplyStart')
+    .setParameters({ messageId: messageId });
+
+  statusSection.addWidget(
+    CardService.newTextButton()
+      .setText('Draft Response')
+      .setOnClickAction(draftAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+  );
+
+  card.addSection(statusSection);
+
+  return card.build();
 }
