@@ -970,14 +970,14 @@ function onToggleAutoLabel(e) {
 }
 
 /**
- * Send digest immediately
+ * Send digest immediately (preview, doesn't affect scheduled digest)
  * @param {Object} e - Event object
  * @returns {ActionResponse}
  */
 function onSendDigestNow(e) {
   try {
     sendDailyDigest();
-    markDigestSent(); // Mark timestamp so next digest only gets new emails
+    // Note: Does NOT mark timestamp - only scheduled digest does
     return CardService.newActionResponseBuilder()
       .setNotification(
         CardService.newNotification()
