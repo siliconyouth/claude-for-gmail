@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Claude for Gmail is a comprehensive Google Apps Script Gmail Add-on that integrates Claude AI (Opus 4.5) for intelligent email assistance. It provides a sidebar UI within Gmail featuring:
 
 - **Core AI**: Email summarization, analysis, draft replies, action item extraction
+- **Security**: AI-powered phishing/scam/spam detection with bulk scanning
 - **Translation**: 100+ languages via Google Translate (free)
 - **Calendar**: Create events from detected meetings
 - **Contacts**: Sender insights and communication history
@@ -14,6 +15,7 @@ Claude for Gmail is a comprehensive Google Apps Script Gmail Add-on that integra
 - **Scheduling**: Send emails at specific times
 - **Priority Inbox**: AI-sorted email dashboard
 - **Snooze**: Remind later functionality
+- **Daily Digest**: Morning email summaries
 - **Analytics**: Usage tracking
 - **Offline**: Cached access to recent analyses
 
@@ -50,6 +52,7 @@ claude-for-gmail/
 │   ├── Code.gs          # Main entry point, test functions
 │   ├── Addon.gs         # Gmail Add-on UI (CardService cards)
 │   ├── Claude.gs        # Claude API integration with caching
+│   ├── Security.gs      # Phishing/scam/spam detection with AI
 │   ├── Gmail.gs         # Gmail utilities (get emails, create drafts)
 │   ├── Config.gs        # Configuration, API key, user preferences
 │   ├── Utils.gs         # Error handling, retry logic, caching
@@ -64,13 +67,16 @@ claude-for-gmail/
 │   ├── Scheduling.gs    # Email send scheduling
 │   ├── Priority.gs      # AI priority inbox dashboard
 │   ├── Snooze.gs        # Snooze/remind feature
+│   ├── SmartCompose.gs  # AI writing suggestions
 │   ├── Analytics.gs     # Usage analytics tracking
+│   ├── OfflineCache.gs  # Offline access to analyses
 │   └── Onboarding.gs    # First-time user setup wizard
 ├── assets/
 │   ├── logo.svg         # Source logo (SVG)
 │   └── logo.png         # Gmail add-on logo (PNG required)
 ├── appsscript.json      # Apps Script manifest + OAuth scopes
 ├── .clasp.json          # clasp config (gitignored)
+├── LICENSE              # MIT License
 ├── CLAUDE.md            # This file
 └── README.md            # User documentation
 ```
@@ -103,7 +109,36 @@ CardService.newCardBuilder()
 ```javascript
 CardService.newNavigation().pushCard(newCard)  // Push new card
 CardService.newNavigation().popCard()          // Go back
+CardService.newNavigation().popToRoot()        // Return to home
 ```
+
+### Security System (Security.gs)
+
+Multi-layer threat detection with caching:
+
+```javascript
+// Quick rule-based check (instant)
+quickSecurityCheck(message)  // Returns { threatLevel, redFlags }
+
+// AI-powered deep analysis
+aiSecurityScan(messageId)  // Returns { threatType, confidence, indicators }
+
+// Batch scan with caching
+batchSecurityScan(count)  // Scans inbox, caches results, returns threats
+
+// Cache management
+getSecurityScanCache()     // Load cached scan results
+saveSecurityScanCache()    // Persist cache
+clearSecurityScanCache()   // Reset cache for fresh scans
+```
+
+**Threat levels:** `SAFE`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
+
+**Cache behavior:**
+- Scanned messages cached for 7 days
+- Detected threats cached for 14 days
+- Cache validates messages still exist in inbox
+- "Clear Cache" option for fresh scans
 
 ### Unified Scheduler (Scheduler.gs)
 
@@ -142,6 +177,9 @@ fullEmailAnalysis(body, messageId)
 // Without caching
 generateReply(body, instructions)
 generateReplyInLanguage(body, instructions, languageCode)
+
+// JSON parsing (handles markdown code blocks)
+parseClaudeJson(response)
 ```
 
 ### Translation (Translation.gs)
@@ -192,6 +230,7 @@ buildErrorCard(title, message)
 | Packages | None | Self-contained code |
 | CardService styling | Limited | Use built-in icons/styles |
 | Add-on context | Contextual only | Pass messageId in parameters |
+| Properties size | ~50KB | Cache cleanup, aggressive pruning |
 
 ## OAuth Scopes (appsscript.json)
 
@@ -334,6 +373,26 @@ function processWithTimeout(items, processFn, timeoutMs = 240000) {
 }
 ```
 
+### Passing Parameters to Actions
+
+CardService requires string parameters:
+
+```javascript
+// Setting parameters
+const action = CardService.newAction()
+  .setFunctionName('handler')
+  .setParameters({
+    messageId: messageId,
+    count: String(count)  // Must be string
+  });
+
+// Reading parameters
+function handler(e) {
+  const messageId = e.parameters.messageId;
+  const count = parseInt(e.parameters.count, 10);
+}
+```
+
 ## Debugging
 
 ### Check API Key
@@ -376,6 +435,16 @@ function cleanupAllTriggers() {
 }
 ```
 
+### Check Security Cache
+```javascript
+function debugSecurityCache() {
+  const cache = getSecurityScanCache();
+  Logger.log('Scanned messages: ' + Object.keys(cache.scanned || {}).length);
+  Logger.log('Cached threats: ' + (cache.threats || []).length);
+  Logger.log('Last cleanup: ' + new Date(cache.lastCleanup));
+}
+```
+
 ## Common Gotchas
 
 1. **Single trigger limit**: Use `Scheduler.gs`, never create direct triggers for features.
@@ -399,6 +468,10 @@ function cleanupAllTriggers() {
 
 8. **Trigger accumulation**: Always delete existing triggers before creating new ones.
 
+9. **GmailThread vs GmailMessage**: `moveToSpam()` is only on GmailThread, not GmailMessage.
+
+10. **Email encoding**: Use CSS-styled elements instead of emojis for cross-client compatibility.
+
 ## API Reference
 
 ### Claude Model
@@ -407,7 +480,7 @@ function cleanupAllTriggers() {
 - Configured in `Config.gs`
 
 ### Google Services Used
-- **GmailApp**: Read emails, create drafts, manage labels
+- **GmailApp**: Read emails, create drafts, manage labels, move to spam
 - **CalendarApp**: Create events from detected meetings
 - **LanguageApp**: Free translation (109 languages)
 - **CacheService**: Per-user caching (6-hour default)
@@ -427,3 +500,12 @@ Before deploying changes:
 - [ ] At least one action (analyze/draft) works
 - [ ] No "Illegal argument" CardService errors
 - [ ] Scheduler status is correct
+- [ ] Security scan completes without timeout
+
+## Author
+
+**Vladimir Dukelic** - [vladimir@dukelic.com](mailto:vladimir@dukelic.com)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
