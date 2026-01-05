@@ -177,13 +177,19 @@ function autoLabelUnreadEmails() {
  * Set up auto-labeling trigger (runs every hour)
  */
 function setupAutoLabelTrigger() {
-  // Remove existing triggers
-  const triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(function(trigger) {
-    if (trigger.getHandlerFunction() === 'autoLabelUnreadEmails') {
-      ScriptApp.deleteTrigger(trigger);
-    }
+  // First clean up ALL existing auto-label triggers
+  removeAutoLabelTrigger();
+
+  // Check if trigger already exists (safety check)
+  const existingTriggers = ScriptApp.getProjectTriggers();
+  const alreadyExists = existingTriggers.some(function(trigger) {
+    return trigger.getHandlerFunction() === 'autoLabelUnreadEmails';
   });
+
+  if (alreadyExists) {
+    Logger.log('Auto-label trigger already exists, skipping creation');
+    return;
+  }
 
   // Create new trigger (minimum 1 hour for add-ons)
   ScriptApp.newTrigger('autoLabelUnreadEmails')
@@ -199,12 +205,32 @@ function setupAutoLabelTrigger() {
  */
 function removeAutoLabelTrigger() {
   const triggers = ScriptApp.getProjectTriggers();
+  let removed = 0;
   triggers.forEach(function(trigger) {
     if (trigger.getHandlerFunction() === 'autoLabelUnreadEmails') {
       ScriptApp.deleteTrigger(trigger);
-      Logger.log('Auto-label trigger removed');
+      removed++;
     }
   });
+  if (removed > 0) {
+    Logger.log('Removed ' + removed + ' auto-label trigger(s)');
+  }
+}
+
+/**
+ * Clean up ALL triggers - run this manually if you get "too many triggers" error
+ * Go to Apps Script editor and run this function
+ */
+function cleanupAllTriggers() {
+  const triggers = ScriptApp.getProjectTriggers();
+  Logger.log('Found ' + triggers.length + ' total triggers');
+
+  triggers.forEach(function(trigger) {
+    Logger.log('Removing trigger: ' + trigger.getHandlerFunction());
+    ScriptApp.deleteTrigger(trigger);
+  });
+
+  Logger.log('All triggers removed. You can now re-enable auto-labeling.');
 }
 
 /**
