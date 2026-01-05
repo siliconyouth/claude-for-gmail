@@ -367,3 +367,388 @@ function parseClaudeJson(response) {
 
   return JSON.parse(jsonStr);
 }
+
+// ============================================================================
+// ENHANCED ERROR HANDLING
+// ============================================================================
+
+/**
+ * Error log storage key
+ */
+const PREF_ERROR_LOG = 'error_log';
+const MAX_ERROR_LOG_SIZE = 50;
+
+/**
+ * Circuit breaker state
+ */
+const CIRCUIT_BREAKER_KEY = 'circuit_breaker';
+const CIRCUIT_BREAKER_THRESHOLD = 5;
+const CIRCUIT_BREAKER_RESET_TIME = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Track an error for analytics and debugging
+ * @param {string} context - Where the error occurred
+ * @param {Error} error - The error object
+ * @param {Object} metadata - Additional context
+ */
+function trackError(context, error, metadata) {
+  try {
+    const errorLog = getPreference(PREF_ERROR_LOG, []);
+    const parsed = parseError(error);
+
+    const errorEntry = {
+      timestamp: new Date().toISOString(),
+      context: context,
+      type: parsed.type,
+      message: error.message,
+      metadata: metadata || {},
+      stack: error.stack ? error.stack.substring(0, 500) : null
+    };
+
+    errorLog.unshift(errorEntry);
+
+    // Keep only recent errors
+    if (errorLog.length > MAX_ERROR_LOG_SIZE) {
+      errorLog.length = MAX_ERROR_LOG_SIZE;
+    }
+
+    setPreference(PREF_ERROR_LOG, errorLog);
+
+    // Log to console
+    logError(context, error);
+
+    // Update circuit breaker if API error
+    if (parsed.type === ErrorType.API_ERROR || parsed.type === ErrorType.RATE_LIMIT) {
+      updateCircuitBreaker(true);
+    }
+
+  } catch (e) {
+    // Silently fail - don't break user experience for error tracking
+    Logger.log('Error tracking failed: ' + e.message);
+  }
+}
+
+/**
+ * Get recent errors for debugging
+ * @param {number} limit - Number of errors to return
+ * @returns {Array} Recent errors
+ */
+function getRecentErrors(limit) {
+  const errors = getPreference(PREF_ERROR_LOG, []);
+  return errors.slice(0, limit || 10);
+}
+
+/**
+ * Clear error log
+ */
+function clearErrorLog() {
+  setPreference(PREF_ERROR_LOG, []);
+}
+
+/**
+ * Get error statistics
+ * @returns {Object} Error stats
+ */
+function getErrorStats() {
+  const errors = getPreference(PREF_ERROR_LOG, []);
+
+  if (errors.length === 0) {
+    return { totalErrors: 0, byType: {}, recentRate: 0 };
+  }
+
+  // Count by type
+  const byType = {};
+  errors.forEach(function(e) {
+    byType[e.type] = (byType[e.type] || 0) + 1;
+  });
+
+  // Calculate recent error rate (last hour)
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const recentErrors = errors.filter(function(e) {
+    return new Date(e.timestamp) > oneHourAgo;
+  });
+
+  return {
+    totalErrors: errors.length,
+    byType: byType,
+    recentCount: recentErrors.length,
+    recentRate: recentErrors.length / 60 // errors per minute
+  };
+}
+
+// ============================================================================
+// CIRCUIT BREAKER PATTERN
+// ============================================================================
+
+/**
+ * Check if circuit breaker is open (blocking requests)
+ * @returns {boolean}
+ */
+function isCircuitBreakerOpen() {
+  const breaker = getPreference(CIRCUIT_BREAKER_KEY, { failures: 0, lastFailure: null, isOpen: false });
+
+  if (!breaker.isOpen) {
+    return false;
+  }
+
+  // Check if reset time has passed
+  if (breaker.lastFailure) {
+    const timeSinceFailure = Date.now() - new Date(breaker.lastFailure).getTime();
+    if (timeSinceFailure > CIRCUIT_BREAKER_RESET_TIME) {
+      // Half-open: allow one request through
+      resetCircuitBreaker();
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Update circuit breaker state
+ * @param {boolean} isFailure - Whether this is a failure
+ */
+function updateCircuitBreaker(isFailure) {
+  const breaker = getPreference(CIRCUIT_BREAKER_KEY, { failures: 0, lastFailure: null, isOpen: false });
+
+  if (isFailure) {
+    breaker.failures++;
+    breaker.lastFailure = new Date().toISOString();
+
+    if (breaker.failures >= CIRCUIT_BREAKER_THRESHOLD) {
+      breaker.isOpen = true;
+      Logger.log('Circuit breaker OPENED after ' + breaker.failures + ' failures');
+    }
+  } else {
+    // Success - reset failures
+    breaker.failures = 0;
+    breaker.isOpen = false;
+  }
+
+  setPreference(CIRCUIT_BREAKER_KEY, breaker);
+}
+
+/**
+ * Reset circuit breaker
+ */
+function resetCircuitBreaker() {
+  setPreference(CIRCUIT_BREAKER_KEY, { failures: 0, lastFailure: null, isOpen: false });
+  Logger.log('Circuit breaker RESET');
+}
+
+/**
+ * Get circuit breaker status
+ * @returns {Object}
+ */
+function getCircuitBreakerStatus() {
+  return getPreference(CIRCUIT_BREAKER_KEY, { failures: 0, lastFailure: null, isOpen: false });
+}
+
+// ============================================================================
+// USER-FRIENDLY ERROR CARDS
+// ============================================================================
+
+/**
+ * Build an error card for display
+ * @param {Error} error - The error
+ * @param {string} context - What was being attempted
+ * @returns {Card}
+ */
+function buildErrorCard(error, context) {
+  const parsed = parseError(error);
+
+  const builder = CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader()
+      .setTitle('Something Went Wrong')
+      .setSubtitle(context || 'Operation failed'));
+
+  // Error message section
+  const errorSection = CardService.newCardSection()
+    .addWidget(CardService.newDecoratedText()
+      .setText(parsed.message)
+      .setWrapText(true)
+      .setStartIcon(CardService.newIconImage()
+        .setIcon(CardService.Icon.DESCRIPTION)));
+
+  builder.addSection(errorSection);
+
+  // Add recovery suggestions based on error type
+  const recoverySection = CardService.newCardSection()
+    .setHeader('What to do');
+
+  switch (parsed.type) {
+    case ErrorType.AUTH_ERROR:
+      recoverySection.addWidget(CardService.newTextParagraph()
+        .setText('1. Open Script Properties in Apps Script editor\n2. Add or update CLAUDE_API_KEY\n3. Get your key from console.anthropic.com'));
+      recoverySection.addWidget(CardService.newTextButton()
+        .setText('Open Settings')
+        .setOnClickAction(CardService.newAction()
+          .setFunctionName('showSettings')));
+      break;
+
+    case ErrorType.RATE_LIMIT:
+      recoverySection.addWidget(CardService.newTextParagraph()
+        .setText('You\'ve made too many requests. Please wait a moment before trying again.'));
+      recoverySection.addWidget(CardService.newTextButton()
+        .setText('Try Again')
+        .setOnClickAction(CardService.newAction()
+          .setFunctionName('refreshCard')));
+      break;
+
+    case ErrorType.NETWORK_ERROR:
+      recoverySection.addWidget(CardService.newTextParagraph()
+        .setText('Check your internet connection and try again.'));
+      recoverySection.addWidget(CardService.newTextButton()
+        .setText('Retry')
+        .setOnClickAction(CardService.newAction()
+          .setFunctionName('refreshCard')));
+      break;
+
+    case ErrorType.GMAIL_ERROR:
+      recoverySection.addWidget(CardService.newTextParagraph()
+        .setText('The email may have been moved or deleted. Try opening a different email.'));
+      break;
+
+    default:
+      recoverySection.addWidget(CardService.newTextParagraph()
+        .setText('Try again or contact support if the problem persists.'));
+      if (parsed.isRetryable) {
+        recoverySection.addWidget(CardService.newTextButton()
+          .setText('Try Again')
+          .setOnClickAction(CardService.newAction()
+            .setFunctionName('refreshCard')));
+      }
+  }
+
+  builder.addSection(recoverySection);
+
+  // Debug info (collapsed by default)
+  const debugSection = CardService.newCardSection()
+    .setCollapsible(true)
+    .setHeader('Technical Details')
+    .addWidget(CardService.newTextParagraph()
+      .setText('Error Type: ' + parsed.type + '\nTime: ' + new Date().toISOString()));
+
+  builder.addSection(debugSection);
+
+  return builder.build();
+}
+
+/**
+ * Build error notification
+ * @param {Error} error - The error
+ * @returns {ActionResponse}
+ */
+function buildErrorNotification(error) {
+  const parsed = parseError(error);
+
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification()
+      .setText(parsed.message))
+    .build();
+}
+
+/**
+ * Safe wrapper for operations that shows error card on failure
+ * @param {Function} operation - The operation to perform
+ * @param {string} context - What is being attempted
+ * @returns {Card|ActionResponse}
+ */
+function safeOperation(operation, context) {
+  try {
+    // Check circuit breaker first
+    if (isCircuitBreakerOpen()) {
+      return buildErrorCard(
+        new Error('Service temporarily unavailable. Please try again in a few minutes.'),
+        context
+      );
+    }
+
+    const result = operation();
+
+    // Success - update circuit breaker
+    updateCircuitBreaker(false);
+
+    return result;
+
+  } catch (error) {
+    // Track error
+    trackError(context, error);
+
+    // Return error card
+    return buildErrorCard(error, context);
+  }
+}
+
+/**
+ * Safe wrapper that returns ActionResponse with notification on error
+ * @param {Function} operation - The operation to perform
+ * @param {string} context - What is being attempted
+ * @param {Function} successBuilder - Function to build success response
+ * @returns {ActionResponse}
+ */
+function safeAction(operation, context, successBuilder) {
+  try {
+    if (isCircuitBreakerOpen()) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification()
+          .setText('Service temporarily unavailable. Please try again in a few minutes.'))
+        .build();
+    }
+
+    const result = operation();
+    updateCircuitBreaker(false);
+    return successBuilder(result);
+
+  } catch (error) {
+    trackError(context, error);
+    return buildErrorNotification(error);
+  }
+}
+
+// ============================================================================
+// GRACEFUL DEGRADATION
+// ============================================================================
+
+/**
+ * Execute with fallback on failure
+ * @param {Function} primaryFn - Primary function to try
+ * @param {Function} fallbackFn - Fallback function if primary fails
+ * @param {string} context - Context for logging
+ * @returns {*} Result from primary or fallback
+ */
+function withFallback(primaryFn, fallbackFn, context) {
+  try {
+    return primaryFn();
+  } catch (error) {
+    Logger.log('Primary failed for ' + context + ', using fallback: ' + error.message);
+    return fallbackFn();
+  }
+}
+
+/**
+ * Execute operation with timeout simulation
+ * Note: Apps Script doesn't support true timeouts, this is for structure
+ * @param {Function} operation - The operation
+ * @param {number} maxTime - Max time in ms (informational)
+ * @returns {*} Result
+ */
+function withTimeout(operation, maxTime) {
+  const startTime = Date.now();
+
+  try {
+    const result = operation();
+    const elapsed = Date.now() - startTime;
+
+    if (elapsed > maxTime) {
+      Logger.log('Operation took longer than expected: ' + elapsed + 'ms > ' + maxTime + 'ms');
+    }
+
+    return result;
+
+  } catch (error) {
+    const elapsed = Date.now() - startTime;
+    Logger.log('Operation failed after ' + elapsed + 'ms');
+    throw error;
+  }
+}

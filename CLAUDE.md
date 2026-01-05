@@ -4,179 +4,426 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Claude for Gmail is a Google Apps Script Gmail Add-on that integrates Claude AI (Opus 4.5) for intelligent email assistance. It provides a sidebar UI within Gmail for summarizing emails, analyzing priority/sentiment, drafting replies, extracting action items, auto-labeling, and daily digests.
+Claude for Gmail is a comprehensive Google Apps Script Gmail Add-on that integrates Claude AI (Opus 4.5) for intelligent email assistance. It provides a sidebar UI within Gmail featuring:
+
+- **Core AI**: Email summarization, analysis, draft replies, action item extraction
+- **Translation**: 100+ languages via Google Translate (free)
+- **Calendar**: Create events from detected meetings
+- **Contacts**: Sender insights and communication history
+- **Attachments**: AI-powered document summaries
+- **Scheduling**: Send emails at specific times
+- **Priority Inbox**: AI-sorted email dashboard
+- **Snooze**: Remind later functionality
+- **Analytics**: Usage tracking
+- **Offline**: Cached access to recent analyses
 
 ## Development Commands
 
 ```bash
 # Push local changes to Google Apps Script
+clasp push
+
+# Force push (overwrites remote)
 clasp push --force
 
-# Pull remote changes from Google Apps Script
+# Pull remote changes
 clasp pull
 
-# Deploy a new version (for add-on publishing)
+# Deploy a new version
 clasp deploy
 
-# View logs
+# View execution logs
 clasp logs
 
-# Run a function
+# Open in browser
+clasp open
+
+# Run a specific function
 clasp run <functionName>
 ```
 
 ## Project Structure
 
 ```
+claude-for-gmail/
 ├── src/
-│   ├── Code.gs          # Main entry point, triggers, test functions
-│   ├── Addon.gs         # Gmail Add-on UI (CardService cards and actions)
-│   ├── Claude.gs        # Claude API integration with caching and retry
-│   ├── Gmail.gs         # Gmail utilities (get emails, create drafts, labels)
-│   ├── Config.gs        # Configuration, API key management, preferences
-│   ├── Utils.gs         # Error handling, retry logic, caching utilities
-│   ├── Scheduler.gs     # Unified scheduler (single trigger for all features)
-│   ├── Labels.gs        # Smart auto-labeling system (15 categories)
-│   ├── Digest.gs        # Daily email digest feature
-│   └── Templates.gs     # Email templates with AI fill-in
-├── appsscript.json      # Apps Script manifest with add-on config and OAuth scopes
-├── .clasp.json          # clasp configuration (local only, gitignored)
-└── .clasprc.json        # clasp credentials (local only, gitignored)
+│   ├── Code.gs          # Main entry point, test functions
+│   ├── Addon.gs         # Gmail Add-on UI (CardService cards)
+│   ├── Claude.gs        # Claude API integration with caching
+│   ├── Gmail.gs         # Gmail utilities (get emails, create drafts)
+│   ├── Config.gs        # Configuration, API key, user preferences
+│   ├── Utils.gs         # Error handling, retry logic, caching
+│   ├── Scheduler.gs     # Unified scheduler (single trigger)
+│   ├── Labels.gs        # Smart auto-labeling (15 categories)
+│   ├── Digest.gs        # Daily email digest
+│   ├── Templates.gs     # 20+ email templates with AI fill-in
+│   ├── Translation.gs   # Google Translate (109 languages)
+│   ├── Calendar.gs      # Google Calendar integration
+│   ├── Contacts.gs      # Contact insights and history
+│   ├── Attachments.gs   # PDF/document summarization
+│   ├── Scheduling.gs    # Email send scheduling
+│   ├── Priority.gs      # AI priority inbox dashboard
+│   ├── Snooze.gs        # Snooze/remind feature
+│   ├── Analytics.gs     # Usage analytics tracking
+│   └── Onboarding.gs    # First-time user setup wizard
+├── assets/
+│   ├── logo.svg         # Source logo (SVG)
+│   └── logo.png         # Gmail add-on logo (PNG required)
+├── appsscript.json      # Apps Script manifest + OAuth scopes
+├── .clasp.json          # clasp config (gitignored)
+├── CLAUDE.md            # This file
+└── README.md            # User documentation
 ```
 
 ## Architecture
 
 ### Gmail Add-on UI (Addon.gs)
-- **CardService**: All UI built with Google's CardService API
-- **Trigger handlers**: `onHomepage()` for sidebar home, `onGmailMessage()` for email context
-- **Action handlers**: `onAnalyzeEmail()`, `onDraftReplyStart()`, `onExtractActions()`, `onFullAnalysis()`
-- **Automation handlers**: `onToggleAutoLabel()`, `onToggleDigest()`, `onSendDigestNow()`
-- **Navigation**: Cards pushed onto stack via `CardService.newNavigation().pushCard()`
+
+The UI is built entirely with Google's CardService API:
+
+```javascript
+// Card structure
+CardService.newCardBuilder()
+  .setHeader(CardService.newCardHeader().setTitle('Title'))
+  .addSection(CardService.newCardSection()
+    .addWidget(CardService.newTextButton()
+      .setText('Action')
+      .setOnClickAction(CardService.newAction().setFunctionName('handler'))
+    )
+  )
+  .build()
+```
+
+**Key handlers:**
+- `onHomepage(e)` - Sidebar home (no email selected)
+- `onGmailMessage(e)` - Email context (viewing an email)
+- `onCompose(e)` - Compose context (writing new email)
+
+**Navigation pattern:**
+```javascript
+CardService.newNavigation().pushCard(newCard)  // Push new card
+CardService.newNavigation().popCard()          // Go back
+```
 
 ### Unified Scheduler (Scheduler.gs)
-**Critical**: Add-ons are limited to **1 time-based trigger per user**. The unified scheduler solves this:
-- Single `runScheduledTasks()` function runs hourly
-- Checks user preferences to determine which features are enabled
-- Runs auto-labeling every hour (if enabled)
-- Runs daily digest at configured hour (if enabled, default 8 AM)
-- Features enabled/disabled via `enableAutoLabel()`, `disableAutoLabel()`, `enableDigest()`, `disableDigest()`
 
-### Core Functions
-- **askClaude(prompt, systemPrompt)**: Base API call to Claude (with retry)
-- **summarizeEmail(body, messageId)**: Returns concise summary (cached)
-- **analyzeEmail(body, messageId)**: Returns {sentiment, priority, category, summary} (cached)
-- **extractActionItems(body, messageId)**: Returns {tasks[], deadlines[], waitingOn[]} (cached)
-- **generateReply(body, instructions)**: Returns draft reply text (not cached)
-- **fullEmailAnalysis(body, messageId)**: Single API call for complete analysis (cached)
+**Critical constraint**: Add-ons are limited to 1 time-based trigger per user.
 
-### Data Flow
+The unified scheduler runs hourly and checks which features need to run:
+
+```javascript
+function runScheduledTasks() {
+  // Runs every hour
+  if (isAutoLabelEnabled()) runAutoLabeling();
+  if (isDigestEnabled() && isDigestTime()) sendDailyDigest();
+  if (hasScheduledEmails()) sendScheduledEmails();
+  if (hasSnoozedEmails()) checkSnoozeReminders();
+}
 ```
-Gmail Message → getEmailBody() → Claude API → CardService UI
-                                           ↓
-                              createReplyDraft() → Gmail Drafts
+
+Enable/disable features:
+```javascript
+enableAutoLabel()    / disableAutoLabel()
+enableDigest(hour)   / disableDigest()
+```
+
+### Claude API Integration (Claude.gs)
+
+```javascript
+// Base API call with retry
+askClaude(prompt, systemPrompt)
+
+// Specialized functions (with caching)
+summarizeEmail(body, messageId)
+analyzeEmail(body, messageId)
+extractActionItems(body, messageId)
+fullEmailAnalysis(body, messageId)
+
+// Without caching
+generateReply(body, instructions)
+generateReplyInLanguage(body, instructions, languageCode)
+```
+
+### Translation (Translation.gs)
+
+Uses Google's free LanguageApp service:
+
+```javascript
+// 109 languages supported
+translateWithGoogle(text, targetLang, sourceLang)
+detectLanguageGoogle(text)
+getCommonLanguages()      // Top 24 languages
+getAllLanguagesSorted()   // All 109 alphabetically
+getLanguageFamilies()     // Grouped by region
+```
+
+### Caching (Utils.gs)
+
+```javascript
+// Cache key format
+getAnalysisCacheKey(messageId, type)  // 'claude_gmail_{type}_{messageId}'
+
+// Operations
+setCached(key, value, expiration)  // Default: 6 hours
+getCached(key)
+clearMessageCache(messageId)
+```
+
+### Error Handling (Utils.gs)
+
+```javascript
+// Retry with exponential backoff
+withRetry(fn, { maxRetries: 3, initialDelay: 2000, maxDelay: 30000 })
+
+// Parse errors for user display
+parseError(error)  // Returns { message, type, retryable }
+
+// User-friendly error cards
+buildErrorCard(title, message)
 ```
 
 ## Key Constraints
 
-- **6-minute execution limit** per function (critical for digest)
-- **1 trigger per user** for add-ons (use unified scheduler)
-- `UrlFetchApp` is the only HTTP client
-- No npm packages - all code must be self-contained
-- CardService widgets have limited styling options
-- Add-on context (`e.gmail.messageId`) only available in contextual triggers
+| Constraint | Limit | Solution |
+|------------|-------|----------|
+| Execution time | 6 minutes | Batch processing, timeout checks |
+| Triggers per user | 1 | Unified scheduler |
+| HTTP client | UrlFetchApp only | No axios/fetch |
+| Packages | None | Self-contained code |
+| CardService styling | Limited | Use built-in icons/styles |
+| Add-on context | Contextual only | Pass messageId in parameters |
 
-## Add-on Deployment
+## OAuth Scopes (appsscript.json)
 
-### Test Deployment (Head)
-1. Push code: `clasp push --force`
-2. In Apps Script editor: Deploy → Test deployments → Install
-3. Open Gmail and find "Claude for Gmail" in sidebar
+```json
+{
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.labels",
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
+    "https://www.googleapis.com/auth/gmail.addons.current.action.compose",
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/userinfo.email"
+  ]
+}
+```
 
-### Re-authorization (after scope changes)
-1. Go to https://myaccount.google.com/permissions
-2. Find "Claude for Gmail" → Remove Access
-3. In Apps Script: Deploy → Test deployments → Install
-4. Open Gmail and authorize when prompted
+## Feature Implementation Patterns
 
-### Production Deployment
-1. Deploy → New deployment → Select type: Add-on
-2. Fill in metadata and submit for review (if publishing to Marketplace)
+### Adding a New Feature
 
-## OAuth Scopes
+1. **Create the service file** (e.g., `NewFeature.gs`):
+```javascript
+function doNewFeatureThing(input) {
+  // Check cache first
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
 
-The add-on requires these scopes (defined in appsscript.json):
-- `gmail.modify` - Read/write emails and labels
-- `gmail.addons.execute` - Run as Gmail add-on
-- `gmail.addons.current.message.readonly` - Access current email
-- `gmail.addons.current.action.compose` - Compose actions
-- `script.external_request` - Call Claude API
-- `script.scriptapp` - Manage triggers
-- `userinfo.email` - Get user's email for digest sending
+  // Call Claude or other API
+  const result = askClaude(prompt, systemPrompt);
 
-## Key Implementation Details
+  // Cache and return
+  setCached(cacheKey, result);
+  return result;
+}
+```
 
-### Claude Model
-- Uses `claude-opus-4-5-20251101` (Opus 4.5)
-- Configured in `Config.gs` → `CONFIG.CLAUDE_MODEL`
+2. **Add UI handler in Addon.gs**:
+```javascript
+function onNewFeature(e) {
+  const messageId = e.parameters.messageId;
+  try {
+    trackFeatureUsage('new_feature');  // Analytics
+    const result = doNewFeatureThing(messageId);
+    const card = buildNewFeatureResultCard(result);
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+  } catch (error) {
+    return handleError('onNewFeature', error);
+  }
+}
+```
 
-### Caching (Utils.gs)
-- Uses `CacheService.getUserCache()` for per-user caching
-- Cache key format: `claude_gmail_analysis_{type}_{messageId}`
-- Default expiration: 6 hours
-- Caches: summaries, analysis, action items, full analysis
-- Clear cache with `clearMessageCache(messageId)`
+3. **Add button in action card**:
+```javascript
+const action = CardService.newAction()
+  .setFunctionName('onNewFeature')
+  .setParameters({ messageId: messageId })
+  .setLoadIndicator(CardService.LoadIndicator.SPINNER);
 
-### Retry Logic (Utils.gs)
-- `withRetry(fn, options)` - Exponential backoff
-- Max 3 retries, delays from 1s to 30s
-- Retries on: rate limits, network errors, API 500s
-- Does NOT retry: auth errors, Gmail errors
+section.addWidget(
+  CardService.newTextButton()
+    .setText('New Feature')
+    .setOnClickAction(action)
+    .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+);
+```
 
-### JSON Parsing (Utils.gs)
-- `parseClaudeJson(response)` - Strips markdown code blocks
-- Claude sometimes wraps JSON in ` ```json ... ``` ` blocks
-- Must strip before `JSON.parse()` or parsing fails
+### Adding Scheduled Tasks
 
-### Digest Optimization (Digest.gs)
-- Limited to 8 emails max (prevents timeout)
-- 4-minute timeout protection with graceful exit
-- Uses cached analysis when available
-- Sends to user via `Session.getActiveUser().getEmail()`
+1. **Add preference constants** in Config.gs:
+```javascript
+const PREF_NEW_FEATURE_ENABLED = 'new_feature_enabled';
+```
 
-## Common Gotchas
+2. **Add to unified scheduler** in Scheduler.gs:
+```javascript
+function runScheduledTasks() {
+  // ... existing tasks ...
+  if (getPreference(PREF_NEW_FEATURE_ENABLED, false)) {
+    runNewFeatureTask();
+  }
+}
+```
 
-1. **Single trigger limit**: Add-ons can only have 1 time-based trigger per user. Use the unified scheduler in `Scheduler.gs` instead of separate triggers.
+## Common Patterns
 
-2. **Trigger minimum interval**: Time-based triggers must be at least 1 hour (not 30 min).
+### JSON Parsing from Claude
 
-3. **OAuth scope changes require full re-auth**:
-   - Uninstall test deployment is NOT enough
-   - Must revoke at https://myaccount.google.com/permissions
-   - Then reinstall and authorize
+Claude sometimes wraps JSON in markdown code blocks:
 
-4. **Script Properties in add-on context**: Access `PropertiesService.getScriptProperties()` directly, not through wrapper functions. Add-on context can have different authorization.
+```javascript
+function parseClaudeJson(response) {
+  let cleaned = response.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+  }
+  return JSON.parse(cleaned);
+}
+```
 
-5. **CardService icon issues**: Some DecoratedText + icon combinations cause "Illegal argument" errors. Use `TextParagraph` instead when issues arise.
+### Rate Limiting Protection
 
-6. **API key storage**: Use Project Settings → Script Properties in the Apps Script editor, not a function call.
+```javascript
+function withRetry(fn, options) {
+  const { maxRetries = 3, initialDelay = 2000 } = options;
+  let lastError;
 
-7. **Execution timeout**: Long operations (like digest with many emails) can hit the 6-minute limit. Add timeout protection and limit batch sizes.
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return fn();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryable(error) || i === maxRetries) throw error;
+      Utilities.sleep(initialDelay * Math.pow(2, i));
+    }
+  }
+}
+```
 
-8. **Trigger accumulation**: Always delete existing triggers before creating new ones. Use `cleanupAllTriggers()` if you get "too many triggers" error.
+### Timeout Protection
+
+```javascript
+function processWithTimeout(items, processFn, timeoutMs = 240000) {
+  const startTime = Date.now();
+  const results = [];
+
+  for (const item of items) {
+    if (Date.now() - startTime > timeoutMs) {
+      Logger.log('Timeout reached, stopping gracefully');
+      break;
+    }
+    results.push(processFn(item));
+  }
+
+  return results;
+}
+```
 
 ## Debugging
 
 ### Check API Key
-Run `checkApiKey()` from Apps Script editor to verify the API key is set.
-
-### Check Triggers
-Run `getSchedulerStatus()` to see which features are enabled and if the scheduler is running.
-
-### Clean Up Triggers
-Run `cleanupAllTriggers()` to remove all accumulated triggers.
+```javascript
+function checkApiKey() {
+  const key = PropertiesService.getScriptProperties().getProperty('CLAUDE_API_KEY');
+  Logger.log(key ? 'API key is set (' + key.length + ' chars)' : 'API key NOT set');
+}
+```
 
 ### Test Claude Connection
-Run `testClaudeConnection()` to verify the Claude API is working.
+```javascript
+function testClaudeConnection() {
+  try {
+    const response = askClaude('Say "Hello" and nothing else.');
+    Logger.log('Claude response: ' + response);
+    return true;
+  } catch (e) {
+    Logger.log('Error: ' + e.message);
+    return false;
+  }
+}
+```
 
-### View Logs
-In Apps Script editor: View → Logs, or use `clasp logs` from terminal.
+### Check Scheduler Status
+```javascript
+function getSchedulerStatus() {
+  const triggers = ScriptApp.getProjectTriggers();
+  Logger.log('Triggers: ' + triggers.length);
+  Logger.log('Auto-label: ' + getPreference(PREF_AUTO_LABEL_ENABLED, false));
+  Logger.log('Digest: ' + getPreference(PREF_DIGEST_ENABLED, false));
+}
+```
+
+### Clean Up Triggers
+```javascript
+function cleanupAllTriggers() {
+  ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
+  Logger.log('All triggers removed');
+}
+```
+
+## Common Gotchas
+
+1. **Single trigger limit**: Use `Scheduler.gs`, never create direct triggers for features.
+
+2. **Scope changes require full re-auth**:
+   - Uninstall is NOT enough
+   - Must revoke at https://myaccount.google.com/permissions
+   - Then reinstall and re-authorize
+
+3. **CardService icon errors**: Some combinations cause "Illegal argument". Valid icons:
+   - `STAR`, `EMAIL`, `BOOKMARK`, `DESCRIPTION`, `CLOCK`, `INVITE`, `PERSON`
+   - NOT valid: `NONE`, `CONFIRM` (despite documentation)
+
+4. **Empty string errors**: `setBottomLabel('')` throws error - only call when value exists.
+
+5. **Script Properties in add-on context**: Access directly, not through wrapper functions.
+
+6. **Cache serialization**: Always `JSON.stringify()` objects before caching.
+
+7. **6-minute timeout**: Long operations need batch processing and timeout checks.
+
+8. **Trigger accumulation**: Always delete existing triggers before creating new ones.
+
+## API Reference
+
+### Claude Model
+- Model: `claude-opus-4-5-20251101` (Opus 4.5)
+- Max tokens: 4096
+- Configured in `Config.gs`
+
+### Google Services Used
+- **GmailApp**: Read emails, create drafts, manage labels
+- **CalendarApp**: Create events from detected meetings
+- **LanguageApp**: Free translation (109 languages)
+- **CacheService**: Per-user caching (6-hour default)
+- **PropertiesService**: Script properties (API key), User properties (preferences)
+- **UrlFetchApp**: External HTTP calls (Claude API)
+- **ScriptApp**: Trigger management
+
+## Testing Checklist
+
+Before deploying changes:
+
+- [ ] `clasp push` succeeds
+- [ ] `testClaudeConnection()` passes
+- [ ] `checkApiKey()` shows key is set
+- [ ] Homepage card loads without errors
+- [ ] Email context card loads
+- [ ] At least one action (analyze/draft) works
+- [ ] No "Illegal argument" CardService errors
+- [ ] Scheduler status is correct

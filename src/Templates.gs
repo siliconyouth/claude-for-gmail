@@ -3,55 +3,215 @@
  * Save and reuse common reply templates with Claude-powered placeholders
  */
 
-// Default templates to start with
+// Default templates - 25+ pre-built options
 const DEFAULT_TEMPLATES = [
+  // === ACKNOWLEDGMENT & RECEIPTS ===
   {
     id: 'acknowledge',
     name: 'Acknowledge Receipt',
     description: 'Confirm you received the email and will respond later',
+    category: 'acknowledgment',
     template: 'Thank you for your email regarding {{subject}}. I wanted to acknowledge receipt and let you know I will review this and get back to you {{timeframe}}.\n\nBest regards'
   },
+  {
+    id: 'quick_ack',
+    name: 'Quick Acknowledgment',
+    description: 'Brief confirmation of receipt',
+    category: 'acknowledgment',
+    template: 'Got it, thanks! I\'ll {{action}} and get back to you {{timeframe}}.'
+  },
+
+  // === MEETINGS ===
   {
     id: 'meeting_accept',
     name: 'Accept Meeting',
     description: 'Accept a meeting invitation',
+    category: 'meetings',
     template: 'Thank you for the meeting invitation. I confirm my attendance for {{meeting_details}}.\n\n{{additional_notes}}\n\nLooking forward to it.'
   },
   {
     id: 'meeting_decline',
     name: 'Decline Meeting',
     description: 'Politely decline a meeting',
+    category: 'meetings',
     template: 'Thank you for thinking of me for this meeting. Unfortunately, {{reason}}.\n\n{{alternative}}\n\nBest regards'
   },
   {
+    id: 'meeting_reschedule',
+    name: 'Reschedule Meeting',
+    description: 'Request to move a meeting to a different time',
+    category: 'meetings',
+    template: 'I hope this finds you well. I need to reschedule our meeting originally planned for {{original_time}}.\n\nWould any of these times work for you instead?\n{{proposed_times}}\n\nApologies for any inconvenience.\n\nBest regards'
+  },
+  {
+    id: 'meeting_propose',
+    name: 'Propose Meeting',
+    description: 'Suggest a meeting time',
+    category: 'meetings',
+    template: 'I\'d like to schedule a meeting to discuss {{topic}}.\n\nWould any of these times work for you?\n{{proposed_times}}\n\nThe meeting should take approximately {{duration}}.\n\nLooking forward to connecting.'
+  },
+
+  // === REQUESTS & QUESTIONS ===
+  {
     id: 'request_info',
-    name: 'Request More Info',
+    name: 'Request Information',
     description: 'Ask for additional information',
+    category: 'requests',
     template: 'Thank you for reaching out. Before I can {{action}}, I would need some additional information:\n\n{{questions}}\n\nOnce I have these details, I will be happy to assist.\n\nBest regards'
   },
   {
+    id: 'request_deadline',
+    name: 'Request Deadline Extension',
+    description: 'Ask for more time on a deadline',
+    category: 'requests',
+    template: 'I\'m writing regarding the deadline for {{project}}.\n\nDue to {{reason}}, I would like to request an extension until {{new_deadline}}.\n\n{{mitigation}}\n\nPlease let me know if this is possible.\n\nBest regards'
+  },
+  {
+    id: 'request_approval',
+    name: 'Request Approval',
+    description: 'Ask for approval or sign-off',
+    category: 'requests',
+    template: 'I\'m seeking your approval for {{item}}.\n\n{{details}}\n\n{{justification}}\n\nPlease let me know if you need any additional information to make your decision.\n\nBest regards'
+  },
+
+  // === FOLLOW-UPS ===
+  {
     id: 'followup',
-    name: 'Follow Up',
+    name: 'General Follow Up',
     description: 'Follow up on a previous email',
+    category: 'followup',
     template: 'I wanted to follow up on my previous email regarding {{subject}}.\n\n{{context}}\n\nPlease let me know if you need any additional information.\n\nBest regards'
   },
+  {
+    id: 'followup_gentle',
+    name: 'Gentle Reminder',
+    description: 'Soft follow-up without pressure',
+    category: 'followup',
+    template: 'I hope you\'re doing well. I wanted to gently follow up on {{subject}}.\n\nNo rush on this - just wanted to make sure it didn\'t slip through the cracks.\n\nBest regards'
+  },
+  {
+    id: 'followup_urgent',
+    name: 'Urgent Follow Up',
+    description: 'Time-sensitive follow-up',
+    category: 'followup',
+    template: 'I\'m following up on {{subject}} as this is now time-sensitive.\n\n{{deadline_info}}\n\nCould you please provide an update at your earliest convenience?\n\nThank you for your prompt attention to this matter.'
+  },
+
+  // === THANK YOU ===
   {
     id: 'thank_you',
     name: 'Thank You',
     description: 'Express gratitude',
+    category: 'thanks',
     template: 'Thank you so much for {{reason}}. {{appreciation}}\n\n{{next_steps}}\n\nBest regards'
   },
   {
+    id: 'thank_interview',
+    name: 'Thank You (Interview)',
+    description: 'Post-interview thank you note',
+    category: 'thanks',
+    template: 'Thank you for taking the time to meet with me today regarding the {{position}} role.\n\nI enjoyed learning about {{company_topic}} and am excited about the opportunity to {{contribution}}.\n\n{{follow_up}}\n\nBest regards'
+  },
+  {
+    id: 'thank_referral',
+    name: 'Thank You (Referral)',
+    description: 'Thank someone for a referral',
+    category: 'thanks',
+    template: 'I wanted to thank you for referring me to {{contact_name}}.\n\n{{outcome}}\n\nI really appreciate you thinking of me.\n\nBest regards'
+  },
+
+  // === DECLINES & APOLOGIES ===
+  {
+    id: 'decline_polite',
+    name: 'Polite Decline',
+    description: 'Politely decline a request',
+    category: 'declines',
+    template: 'Thank you for thinking of me for {{request}}.\n\nUnfortunately, {{reason}}, so I won\'t be able to participate at this time.\n\n{{alternative}}\n\nI appreciate your understanding.'
+  },
+  {
+    id: 'apology',
+    name: 'Apology',
+    description: 'Apologize for an issue or delay',
+    category: 'declines',
+    template: 'I want to sincerely apologize for {{issue}}.\n\n{{explanation}}\n\nTo make this right, {{resolution}}.\n\nThank you for your patience and understanding.'
+  },
+  {
+    id: 'delay_notice',
+    name: 'Delay Notice',
+    description: 'Notify about a delay',
+    category: 'declines',
+    template: 'I wanted to let you know that {{item}} will be delayed.\n\nThe new expected {{timeframe}} is {{new_date}}.\n\n{{reason}}\n\n{{mitigation}}\n\nApologies for any inconvenience.'
+  },
+
+  // === OUT OF OFFICE ===
+  {
     id: 'out_of_office',
-    name: 'Out of Office Response',
+    name: 'Out of Office',
     description: 'Let someone know you are away',
+    category: 'ooo',
     template: 'Thank you for your email. I am currently {{status}} and will have limited access to email until {{return_date}}.\n\n{{urgent_contact}}\n\nI will respond to your email upon my return.\n\nBest regards'
   },
+  {
+    id: 'vacation_handoff',
+    name: 'Vacation Handoff',
+    description: 'Hand off responsibilities while away',
+    category: 'ooo',
+    template: 'I will be out of office from {{start_date}} to {{end_date}}.\n\nDuring this time, {{backup_person}} will be handling {{responsibilities}}.\n\nFor urgent matters, please contact them at {{contact_info}}.\n\nThank you for your understanding.'
+  },
+
+  // === INTRODUCTIONS ===
   {
     id: 'introduction',
     name: 'Self Introduction',
     description: 'Introduce yourself',
+    category: 'introductions',
     template: 'Thank you for connecting. {{intro}}\n\n{{background}}\n\n{{call_to_action}}\n\nBest regards'
+  },
+  {
+    id: 'intro_connection',
+    name: 'Introduce Two People',
+    description: 'Connect two people via email',
+    category: 'introductions',
+    template: 'I\'d like to introduce you both.\n\n{{person1}}, meet {{person2}}. {{person2_background}}\n\n{{person2}}, {{person1}} is {{person1_background}}\n\nI thought you two should connect because {{reason}}.\n\nI\'ll let you take it from here!'
+  },
+  {
+    id: 'intro_cold',
+    name: 'Cold Outreach',
+    description: 'Reach out to someone new',
+    category: 'introductions',
+    template: 'I hope this email finds you well. My name is {{your_name}} and I\'m {{your_role}}.\n\nI\'m reaching out because {{reason}}.\n\n{{value_proposition}}\n\nWould you be open to {{call_to_action}}?\n\nBest regards'
+  },
+
+  // === STATUS UPDATES ===
+  {
+    id: 'status_update',
+    name: 'Project Status Update',
+    description: 'Provide a status update on a project',
+    category: 'updates',
+    template: 'Here\'s a status update on {{project}}:\n\n**Completed:**\n{{completed_items}}\n\n**In Progress:**\n{{in_progress}}\n\n**Next Steps:**\n{{next_steps}}\n\n**Blockers:**\n{{blockers}}\n\nPlease let me know if you have any questions.'
+  },
+  {
+    id: 'weekly_update',
+    name: 'Weekly Update',
+    description: 'Weekly summary email',
+    category: 'updates',
+    template: 'Here\'s my weekly update for {{week}}:\n\n**Highlights:**\n{{highlights}}\n\n**Challenges:**\n{{challenges}}\n\n**Next Week\'s Focus:**\n{{next_week}}\n\nLet me know if you\'d like more details on anything.'
+  },
+
+  // === FEEDBACK ===
+  {
+    id: 'feedback_positive',
+    name: 'Positive Feedback',
+    description: 'Share positive feedback',
+    category: 'feedback',
+    template: 'I wanted to share some positive feedback about {{subject}}.\n\n{{specific_praise}}\n\n{{impact}}\n\nGreat work!'
+  },
+  {
+    id: 'feedback_constructive',
+    name: 'Constructive Feedback',
+    description: 'Share constructive criticism',
+    category: 'feedback',
+    template: 'I wanted to share some thoughts on {{subject}}.\n\n{{positive_aspect}}\n\nOne area for improvement: {{suggestion}}\n\n{{support_offer}}\n\nHappy to discuss further.'
   }
 ];
 
