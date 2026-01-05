@@ -120,15 +120,20 @@ function buildHomepageCard() {
     Logger.log('API key check error: ' + error.message);
   }
 
-  const statusWidget = CardService.newDecoratedText()
-    .setText(apiKeyOk ? 'API: ' + apiKeyStatus : 'API Key Not Set')
-    .setStartIcon(CardService.newIconImage().setIcon(apiKeyOk ? CardService.Icon.CONFIRM : CardService.Icon.STAR));
-
-  if (!apiKeyOk) {
-    statusWidget.setBottomLabel('Go to Project Settings → Script Properties');
+  if (apiKeyOk) {
+    statusSection.addWidget(
+      CardService.newDecoratedText()
+        .setText('API: Connected')
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR))
+    );
+  } else {
+    statusSection.addWidget(
+      CardService.newDecoratedText()
+        .setText('API Key Not Set')
+        .setBottomLabel('Go to Project Settings → Script Properties')
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.EMAIL))
+    );
   }
-
-  statusSection.addWidget(statusWidget);
 
   // Settings button
   const settingsAction = CardService.newAction()
@@ -907,9 +912,9 @@ function getPriorityIcon(priority) {
 function getSentimentIcon(sentiment) {
   switch (sentiment?.toLowerCase()) {
     case 'positive':
-      return CardService.Icon.CONFIRM;
-    case 'negative':
       return CardService.Icon.STAR;
+    case 'negative':
+      return CardService.Icon.EMAIL;
     case 'neutral':
       return CardService.Icon.DESCRIPTION;
     default:
