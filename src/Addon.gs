@@ -3104,16 +3104,102 @@ function onMarkAsSafe(e) {
   }
 }
 
+/**
+ * Navigate back to home card
+ */
+function onBackToHome(e) {
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().popCard())
+    .build();
+}
+
 // ============================================================================
 // BULK ACTION HANDLERS
 // ============================================================================
 
 /**
- * Bulk security scan handler
+ * Bulk security scan handler - shows selection card for message count
  */
 function onBulkSecurityScan(e) {
   try {
-    const results = batchSecurityScan(25);
+    const card = buildScanCountSelectionCard();
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+  } catch (error) {
+    logError('onBulkSecurityScan', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Build card to select number of messages to scan
+ */
+function buildScanCountSelectionCard() {
+  const card = CardService.newCardBuilder();
+
+  card.setHeader(CardService.newCardHeader()
+    .setTitle('Security Scan')
+    .setSubtitle('Select how many messages to scan'));
+
+  const section = CardService.newCardSection();
+
+  section.addWidget(
+    CardService.newTextParagraph()
+      .setText('Scanning more messages takes longer but provides broader coverage. AI analysis is performed on each email.')
+  );
+
+  // Button grid for count selection
+  const counts = [
+    { value: 20, label: '20 messages', desc: 'Quick scan (~1 min)' },
+    { value: 50, label: '50 messages', desc: 'Standard scan (~2-3 min)' },
+    { value: 100, label: '100 messages', desc: 'Deep scan (~5 min)' },
+    { value: 0, label: 'ALL unread', desc: 'Full inbox scan (may take a while)' }
+  ];
+
+  counts.forEach(function(opt) {
+    const action = CardService.newAction()
+      .setFunctionName('onBulkSecurityScanExecute')
+      .setParameters({ count: String(opt.value) })
+      .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+    section.addWidget(
+      CardService.newDecoratedText()
+        .setText(opt.label)
+        .setBottomLabel(opt.desc)
+        .setOnClickAction(action)
+    );
+  });
+
+  card.addSection(section);
+
+  // Back button
+  const backSection = CardService.newCardSection();
+  const backAction = CardService.newAction()
+    .setFunctionName('onBackToHome');
+
+  backSection.addWidget(
+    CardService.newTextButton()
+      .setText('Cancel')
+      .setOnClickAction(backAction)
+  );
+
+  card.addSection(backSection);
+
+  return card.build();
+}
+
+/**
+ * Execute bulk security scan with specified count
+ */
+function onBulkSecurityScanExecute(e) {
+  try {
+    const countParam = e.parameters.count;
+    const count = countParam === '0' ? 500 : parseInt(countParam, 10); // 0 means ALL (capped at 500)
+
+    const results = batchSecurityScan(count);
     const card = buildBulkScanResultsCard(results);
 
     return CardService.newActionResponseBuilder()
@@ -3121,7 +3207,7 @@ function onBulkSecurityScan(e) {
       .build();
 
   } catch (error) {
-    logError('onBulkSecurityScan', error);
+    logError('onBulkSecurityScanExecute', error);
     return CardService.newActionResponseBuilder()
       .setNotification(CardService.newNotification().setText('Error: ' + error.message))
       .build();
