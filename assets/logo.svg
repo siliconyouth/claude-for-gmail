@@ -1,14 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <!-- Background circle -->
-  <circle cx="64" cy="64" r="60" fill="#D97706"/>
+  <defs>
+    <!-- Gradient: Violet → Blue → Cyan (Claude Insider design system) -->
+    <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="50%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#06b4d4"/>
+    </linearGradient>
+    <linearGradient id="envelopeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#60a5fa"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle with gradient -->
+  <circle cx="64" cy="64" r="60" fill="url(#brandGradient)"/>
 
   <!-- Email envelope shape -->
-  <path d="M28 42 L64 68 L100 42 L100 86 L28 86 Z" fill="white" stroke="white" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M28 42 L100 42 L64 68 Z" fill="#FCD34D" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M28 44 L64 70 L100 44 L100 88 L28 88 Z" fill="white" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M28 44 L100 44 L64 70 Z" fill="url(#envelopeGradient)" stroke="white" stroke-width="2" stroke-linejoin="round"/>
 
   <!-- AI sparkle/star -->
-  <g fill="#D97706">
-    <circle cx="92" cy="32" r="8" fill="#FCD34D"/>
-    <path d="M92 22 L94 30 L102 32 L94 34 L92 42 L90 34 L82 32 L90 30 Z" fill="white"/>
-  </g>
+  <circle cx="94" cy="30" r="10" fill="#22d3ee"/>
+  <path d="M94 18 L96 27 L105 30 L96 33 L94 42 L92 33 L83 30 L92 27 Z" fill="white"/>
 </svg>
