@@ -342,3 +342,28 @@ function validateAndGetMessage(messageId) {
 
   return message;
 }
+
+/**
+ * Parse JSON from Claude response, handling markdown code blocks
+ * @param {string} response - Claude's response text
+ * @returns {Object} Parsed JSON object
+ * @throws {Error} If parsing fails
+ */
+function parseClaudeJson(response) {
+  let jsonStr = response.trim();
+
+  // Remove markdown code blocks if present
+  if (jsonStr.startsWith('```json')) {
+    jsonStr = jsonStr.slice(7);
+  } else if (jsonStr.startsWith('```')) {
+    jsonStr = jsonStr.slice(3);
+  }
+
+  if (jsonStr.endsWith('```')) {
+    jsonStr = jsonStr.slice(0, -3);
+  }
+
+  jsonStr = jsonStr.trim();
+
+  return JSON.parse(jsonStr);
+}

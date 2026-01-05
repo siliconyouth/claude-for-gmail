@@ -123,6 +123,18 @@ function removeTrigger() {
 }
 
 /**
+ * Clear cached analysis for a specific message (for testing)
+ * Run with message ID to clear its cache
+ */
+function clearCacheForMessage() {
+  // Change this to the message ID you want to clear
+  const messageId = 'msg-f:1853401742307403005';
+
+  clearMessageCache(messageId);
+  Logger.log('Cache cleared for: ' + messageId);
+}
+
+/**
  * Menu handler for Google Sheets/Docs add-on (if used)
  */
 function onOpen() {

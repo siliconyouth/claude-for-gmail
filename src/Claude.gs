@@ -149,7 +149,7 @@ Respond ONLY with valid JSON, no other text.`;
 
   let result;
   try {
-    result = JSON.parse(response);
+    result = parseClaudeJson(response);
   } catch (e) {
     logError('JSON parse', e);
     result = {
@@ -200,7 +200,7 @@ Respond ONLY with valid JSON, no other text.`;
 
   let result;
   try {
-    result = JSON.parse(response);
+    result = parseClaudeJson(response);
   } catch (e) {
     logError('JSON parse', e);
     result = {
@@ -255,7 +255,7 @@ Respond ONLY with valid JSON, no other text.`;
 
   let result;
   try {
-    result = JSON.parse(response);
+    result = parseClaudeJson(response);
   } catch (e) {
     logError('JSON parse', e);
     result = {
