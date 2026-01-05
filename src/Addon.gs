@@ -204,8 +204,6 @@ function buildHomepageCard() {
       .setOnClickAction(statsAction)
   );
 
-  card.addSection(dashboardSection);
-
   // Automation section
   const automationSection = CardService.newCardSection()
     .setHeader('Automation')
