@@ -9,7 +9,8 @@
     "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
     "https://www.googleapis.com/auth/gmail.addons.current.action.compose",
     "https://www.googleapis.com/auth/script.external_request",
-    "https://www.googleapis.com/auth/script.scriptapp"
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/userinfo.email"
   ],
   "addOns": {
     "common": {
