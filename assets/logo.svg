@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="#D97706"/>
+
+  <!-- Email envelope shape -->
+  <path d="M28 42 L64 68 L100 42 L100 86 L28 86 Z" fill="white" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M28 42 L100 42 L64 68 Z" fill="#FCD34D" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- AI sparkle/star -->
+  <g fill="#D97706">
+    <circle cx="92" cy="32" r="8" fill="#FCD34D"/>
+    <path d="M92 22 L94 30 L102 32 L94 34 L92 42 L90 34 L82 32 L90 30 Z" fill="white"/>
+  </g>
+</svg>
