@@ -16,6 +16,10 @@ const LOGO_URL = 'https://raw.githubusercontent.com/siliconyouth/claude-for-gmai
  * @returns {Card} The homepage card
  */
 function onHomepage(e) {
+  // Check if onboarding is needed
+  if (needsOnboarding()) {
+    return buildOnboardingCard();
+  }
   return buildHomepageCard();
 }
 
@@ -146,9 +150,66 @@ function buildHomepageCard() {
       .setOnClickAction(settingsAction)
   );
 
+  // Dashboard section - Priority Inbox
+  const dashboardSection = CardService.newCardSection()
+    .setHeader('Dashboard');
+
+  const priorityAction = CardService.newAction()
+    .setFunctionName('onShowPriorityInbox')
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  dashboardSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Priority Inbox')
+      .setBottomLabel('AI-sorted by importance')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR))
+      .setOnClickAction(priorityAction)
+  );
+
+  // Scheduled emails count
+  const scheduledEmails = getScheduledEmails();
+  const scheduledAction = CardService.newAction()
+    .setFunctionName('onShowScheduledEmails');
+
+  dashboardSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Scheduled Emails')
+      .setBottomLabel(scheduledEmails.length + ' pending')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CLOCK))
+      .setOnClickAction(scheduledAction)
+  );
+
+  // Snoozed emails count
+  const snoozedEmails = getSnoozedEmails();
+  const snoozedAction = CardService.newAction()
+    .setFunctionName('onShowSnoozedEmails');
+
+  dashboardSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Snoozed Emails')
+      .setBottomLabel(snoozedEmails.length + ' reminders')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.INVITE))
+      .setOnClickAction(snoozedAction)
+  );
+
+  // Usage stats
+  const statsAction = CardService.newAction()
+    .setFunctionName('onShowUsageStats');
+
+  dashboardSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Usage Stats')
+      .setBottomLabel('View your productivity insights')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+      .setOnClickAction(statsAction)
+  );
+
+  card.addSection(dashboardSection);
+
   // Automation section
   const automationSection = CardService.newCardSection()
-    .setHeader('Automation');
+    .setHeader('Automation')
+    .setCollapsible(true);
 
   // Daily digest toggle
   const digestAction = CardService.newAction()
@@ -199,6 +260,7 @@ function buildHomepageCard() {
   );
 
   card.addSection(welcomeSection);
+  card.addSection(dashboardSection);
   card.addSection(featuresSection);
   card.addSection(automationSection);
   card.addSection(statusSection);
@@ -391,13 +453,74 @@ function buildComposeCard() {
       .setImageUrl(LOGO_URL)
   );
 
-  const section = CardService.newCardSection()
-    .addWidget(
-      CardService.newTextParagraph()
-        .setText('Compose assistance coming soon. Use "Draft Reply" when viewing an email.')
-    );
+  // Smart compose suggestions
+  const composeSection = CardService.newCardSection()
+    .setHeader('Writing Assistance');
 
-  card.addSection(section);
+  // Improve writing
+  composeSection.addWidget(
+    CardService.newTextInput()
+      .setFieldName('draftText')
+      .setTitle('Enter your draft text')
+      .setHint('Type or paste your draft here...')
+      .setMultiline(true)
+  );
+
+  const improveAction = CardService.newAction()
+    .setFunctionName('onImproveWriting')
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  composeSection.addWidget(
+    CardService.newTextButton()
+      .setText('Improve Writing')
+      .setOnClickAction(improveAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+  );
+
+  const toneCheckAction = CardService.newAction()
+    .setFunctionName('onCheckTone')
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  composeSection.addWidget(
+    CardService.newTextButton()
+      .setText('Check Tone')
+      .setOnClickAction(toneCheckAction)
+  );
+
+  card.addSection(composeSection);
+
+  // Subject line suggestions
+  const subjectSection = CardService.newCardSection()
+    .setHeader('Subject Line');
+
+  const subjectAction = CardService.newAction()
+    .setFunctionName('onSuggestSubject')
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  subjectSection.addWidget(
+    CardService.newTextButton()
+      .setText('Suggest Subject Lines')
+      .setOnClickAction(subjectAction)
+  );
+
+  card.addSection(subjectSection);
+
+  // Templates
+  const templateSection = CardService.newCardSection()
+    .setHeader('Start From Template');
+
+  const templateAction = CardService.newAction()
+    .setFunctionName('onShowComposeTemplates');
+
+  templateSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Browse Templates')
+      .setBottomLabel('25+ professional templates')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.DESCRIPTION))
+      .setOnClickAction(templateAction)
+  );
+
+  card.addSection(templateSection);
 
   return card.build();
 }
@@ -2197,4 +2320,252 @@ function buildMeetingCard(result, messageId) {
   card.addSection(statusSection);
 
   return card.build();
+}
+
+// ============================================================================
+// NEW FEATURE HANDLERS
+// ============================================================================
+
+/**
+ * Show Priority Inbox dashboard
+ */
+function onShowPriorityInbox(e) {
+  try {
+    const inbox = getPriorityInbox(20);
+    const card = buildPriorityInboxCard(inbox);
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+  } catch (error) {
+    logError('onShowPriorityInbox', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error loading priority inbox'))
+      .build();
+  }
+}
+
+function buildPriorityInboxCard(inbox) {
+  const card = CardService.newCardBuilder();
+  card.setHeader(CardService.newCardHeader()
+    .setTitle('Priority Inbox')
+    .setSubtitle(inbox.totalEmails + ' emails analyzed')
+    .setImageUrl(LOGO_URL));
+
+  if (inbox.sections.urgent && inbox.sections.urgent.length > 0) {
+    const urgentSection = CardService.newCardSection().setHeader('Urgent');
+    inbox.sections.urgent.slice(0, 5).forEach(function(email) {
+      urgentSection.addWidget(CardService.newDecoratedText()
+        .setText(email.subject)
+        .setBottomLabel(extractSenderName(email.from))
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR)));
+    });
+    card.addSection(urgentSection);
+  }
+
+  if (inbox.sections.important && inbox.sections.important.length > 0) {
+    const importantSection = CardService.newCardSection().setHeader('Important');
+    inbox.sections.important.slice(0, 5).forEach(function(email) {
+      importantSection.addWidget(CardService.newDecoratedText()
+        .setText(email.subject)
+        .setBottomLabel(extractSenderName(email.from))
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK)));
+    });
+    card.addSection(importantSection);
+  }
+
+  return card.build();
+}
+
+function onRefreshPriorityInbox(e) {
+  refreshPriorityInbox();
+  return onShowPriorityInbox(e);
+}
+
+function onShowScheduledEmails(e) {
+  const scheduled = getScheduledEmails();
+  const card = CardService.newCardBuilder();
+  card.setHeader(CardService.newCardHeader()
+    .setTitle('Scheduled Emails')
+    .setSubtitle(scheduled.length + ' pending'));
+
+  const section = CardService.newCardSection();
+  if (scheduled.length === 0) {
+    section.addWidget(CardService.newTextParagraph().setText('No scheduled emails.'));
+  } else {
+    scheduled.forEach(function(email) {
+      section.addWidget(CardService.newDecoratedText()
+        .setText(email.subject)
+        .setBottomLabel('To: ' + email.to + ' | ' + formatScheduledTime(email.sendAt))
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CLOCK)));
+    });
+  }
+  card.addSection(section);
+
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().pushCard(card.build()))
+    .build();
+}
+
+function onShowSnoozedEmails(e) {
+  const snoozed = getSnoozedEmails();
+  const card = CardService.newCardBuilder();
+  card.setHeader(CardService.newCardHeader()
+    .setTitle('Snoozed Emails')
+    .setSubtitle(snoozed.length + ' reminders'));
+
+  const section = CardService.newCardSection();
+  if (snoozed.length === 0) {
+    section.addWidget(CardService.newTextParagraph().setText('No snoozed emails.'));
+  } else {
+    snoozed.forEach(function(email) {
+      section.addWidget(CardService.newDecoratedText()
+        .setText(email.subject)
+        .setBottomLabel(extractSenderName(email.from) + ' | ' + formatSnoozeTime(email.remindAt))
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.INVITE)));
+    });
+  }
+  card.addSection(section);
+
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().pushCard(card.build()))
+    .build();
+}
+
+function onShowUsageStats(e) {
+  const stats = getUsageStats();
+  const card = CardService.newCardBuilder();
+  card.setHeader(CardService.newCardHeader()
+    .setTitle('Usage Statistics')
+    .setSubtitle('Your productivity insights'));
+
+  const section = CardService.newCardSection();
+  section.addWidget(CardService.newDecoratedText()
+    .setText('Total Actions: ' + stats.totalActions)
+    .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR)));
+  section.addWidget(CardService.newDecoratedText()
+    .setText('Sessions: ' + stats.totalSessions)
+    .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.PERSON)));
+  section.addWidget(CardService.newDecoratedText()
+    .setText('Daily Average: ' + stats.dailyAverage)
+    .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK)));
+  card.addSection(section);
+
+  if (stats.topFeatures && stats.topFeatures.length > 0) {
+    const featuresSection = CardService.newCardSection().setHeader('Top Features');
+    stats.topFeatures.forEach(function(f) {
+      featuresSection.addWidget(CardService.newDecoratedText()
+        .setText(f.name.replace(/_/g, ' '))
+        .setBottomLabel(f.count + ' uses'));
+    });
+    card.addSection(featuresSection);
+  }
+
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().pushCard(card.build()))
+    .build();
+}
+
+// Smart Compose handlers
+function onImproveWriting(e) {
+  const draftText = e.formInput?.draftText || '';
+  if (!draftText) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Enter text first'))
+      .build();
+  }
+  try {
+    const result = improveWriting(draftText);
+    const card = CardService.newCardBuilder()
+      .setHeader(CardService.newCardHeader().setTitle('Improved Writing'))
+      .addSection(CardService.newCardSection()
+        .addWidget(CardService.newTextParagraph().setText(result.improved || draftText)))
+      .build();
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+  } catch (err) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + err.message))
+      .build();
+  }
+}
+
+function onCheckTone(e) {
+  const draftText = e.formInput?.draftText || '';
+  if (!draftText) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Enter text first'))
+      .build();
+  }
+  try {
+    const result = checkTone(draftText);
+    const card = CardService.newCardBuilder()
+      .setHeader(CardService.newCardHeader().setTitle('Tone Analysis'))
+      .addSection(CardService.newCardSection()
+        .addWidget(CardService.newDecoratedText()
+          .setText('Detected: ' + (result.currentTone || 'Unknown'))
+          .setBottomLabel(result.matchesTarget ? 'Matches target' : 'Consider adjusting')))
+      .build();
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+  } catch (err) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + err.message))
+      .build();
+  }
+}
+
+function onSuggestSubject(e) {
+  const draftText = e.formInput?.draftText || '';
+  if (!draftText) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Enter text first'))
+      .build();
+  }
+  try {
+    const subjects = suggestSubjectLines(draftText);
+    const section = CardService.newCardSection();
+    (subjects || []).forEach(function(s) {
+      section.addWidget(CardService.newDecoratedText().setText(s).setWrapText(true));
+    });
+    const card = CardService.newCardBuilder()
+      .setHeader(CardService.newCardHeader().setTitle('Subject Ideas'))
+      .addSection(section)
+      .build();
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+  } catch (err) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + err.message))
+      .build();
+  }
+}
+
+function onShowComposeTemplates(e) {
+  const templates = getTemplates();
+  const section = CardService.newCardSection();
+  templates.slice(0, 15).forEach(function(t) {
+    section.addWidget(CardService.newDecoratedText()
+      .setText(t.name)
+      .setBottomLabel(t.category || 'general'));
+  });
+  const card = CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader().setTitle('Templates').setSubtitle('25+ available'))
+    .addSection(section)
+    .build();
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().pushCard(card))
+    .build();
+}
+
+// Alias functions for onboarding and error recovery
+function showSettings(e) { return onOpenSettings(e); }
+function showPriorityInbox(e) { return onShowPriorityInbox(e); }
+function showUsageStats(e) { return onShowUsageStats(e); }
+function refreshCard(e) {
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().popToRoot())
+    .build();
 }
