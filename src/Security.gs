@@ -565,3 +565,257 @@ function batchSecurityScan(count) {
 
   return results;
 }
+
+/**
+ * Bulk archive all detected threats
+ * @param {Object[]} threats - Array of threat objects from batchSecurityScan
+ * @returns {Object} Results
+ */
+function bulkArchiveThreats(threats) {
+  const results = {
+    archived: 0,
+    failed: 0,
+    errors: []
+  };
+
+  threats.forEach(function(threat) {
+    try {
+      archiveSuspiciousEmail(threat.messageId, 'Bulk archive: ' + threat.threatLevel);
+      results.archived++;
+    } catch (e) {
+      results.failed++;
+      results.errors.push({ messageId: threat.messageId, error: e.message });
+    }
+  });
+
+  trackFeatureUsage('bulk_archive');
+  return results;
+}
+
+/**
+ * Bulk report emails as spam
+ * @param {string[]} messageIds - Array of message IDs
+ * @returns {Object} Results
+ */
+function bulkReportSpam(messageIds) {
+  const results = {
+    reported: 0,
+    failed: 0,
+    errors: []
+  };
+
+  messageIds.forEach(function(messageId) {
+    try {
+      reportAsSpam(messageId);
+      results.reported++;
+    } catch (e) {
+      results.failed++;
+      results.errors.push({ messageId: messageId, error: e.message });
+    }
+  });
+
+  trackFeatureUsage('bulk_report_spam');
+  return results;
+}
+
+/**
+ * Bulk apply label to emails
+ * @param {string[]} messageIds - Array of message IDs
+ * @param {string} labelName - Label to apply
+ * @returns {Object} Results
+ */
+function bulkApplyLabel(messageIds, labelName) {
+  const results = {
+    labeled: 0,
+    failed: 0,
+    errors: []
+  };
+
+  const label = getOrCreateLabel(labelName);
+
+  messageIds.forEach(function(messageId) {
+    try {
+      const message = GmailApp.getMessageById(messageId);
+      if (message) {
+        message.getThread().addLabel(label);
+        results.labeled++;
+      }
+    } catch (e) {
+      results.failed++;
+      results.errors.push({ messageId: messageId, error: e.message });
+    }
+  });
+
+  trackFeatureUsage('bulk_label');
+  return results;
+}
+
+/**
+ * Bulk archive emails
+ * @param {string[]} messageIds - Array of message IDs
+ * @returns {Object} Results
+ */
+function bulkArchive(messageIds) {
+  const results = {
+    archived: 0,
+    failed: 0,
+    errors: []
+  };
+
+  messageIds.forEach(function(messageId) {
+    try {
+      const message = GmailApp.getMessageById(messageId);
+      if (message) {
+        message.getThread().moveToArchive();
+        results.archived++;
+      }
+    } catch (e) {
+      results.failed++;
+      results.errors.push({ messageId: messageId, error: e.message });
+    }
+  });
+
+  trackFeatureUsage('bulk_archive');
+  return results;
+}
+
+/**
+ * Bulk delete emails (move to trash)
+ * @param {string[]} messageIds - Array of message IDs
+ * @returns {Object} Results
+ */
+function bulkTrash(messageIds) {
+  const results = {
+    trashed: 0,
+    failed: 0,
+    errors: []
+  };
+
+  messageIds.forEach(function(messageId) {
+    try {
+      const message = GmailApp.getMessageById(messageId);
+      if (message) {
+        message.getThread().moveToTrash();
+        results.trashed++;
+      }
+    } catch (e) {
+      results.failed++;
+      results.errors.push({ messageId: messageId, error: e.message });
+    }
+  });
+
+  trackFeatureUsage('bulk_trash');
+  return results;
+}
+
+/**
+ * Bulk mark as read
+ * @param {string[]} messageIds - Array of message IDs
+ * @returns {Object} Results
+ */
+function bulkMarkRead(messageIds) {
+  const results = {
+    marked: 0,
+    failed: 0
+  };
+
+  messageIds.forEach(function(messageId) {
+    try {
+      const message = GmailApp.getMessageById(messageId);
+      if (message) {
+        message.getThread().markRead();
+        results.marked++;
+      }
+    } catch (e) {
+      results.failed++;
+    }
+  });
+
+  trackFeatureUsage('bulk_mark_read');
+  return results;
+}
+
+/**
+ * Bulk mark as unread
+ * @param {string[]} messageIds - Array of message IDs
+ * @returns {Object} Results
+ */
+function bulkMarkUnread(messageIds) {
+  const results = {
+    marked: 0,
+    failed: 0
+  };
+
+  messageIds.forEach(function(messageId) {
+    try {
+      const message = GmailApp.getMessageById(messageId);
+      if (message) {
+        message.getThread().markUnread();
+        results.marked++;
+      }
+    } catch (e) {
+      results.failed++;
+    }
+  });
+
+  trackFeatureUsage('bulk_mark_unread');
+  return results;
+}
+
+/**
+ * Get inbox summary for bulk actions
+ * @param {number} count - Number of threads to analyze
+ * @returns {Object} Summary with counts and categories
+ */
+function getInboxSummary(count) {
+  count = count || 50;
+  const threads = GmailApp.getInboxThreads(0, count);
+
+  const summary = {
+    total: threads.length,
+    unread: 0,
+    categories: {},
+    oldestDate: null,
+    newestDate: null,
+    threats: {
+      high: 0,
+      medium: 0,
+      low: 0
+    }
+  };
+
+  threads.forEach(function(thread) {
+    try {
+      if (thread.isUnread()) {
+        summary.unread++;
+      }
+
+      const message = thread.getMessages()[0];
+      const date = message.getDate();
+
+      if (!summary.oldestDate || date < summary.oldestDate) {
+        summary.oldestDate = date;
+      }
+      if (!summary.newestDate || date > summary.newestDate) {
+        summary.newestDate = date;
+      }
+
+      // Quick threat check
+      const from = message.getFrom();
+      if (!isSenderWhitelisted(from)) {
+        const check = quickSecurityCheck(message);
+        if (check.threatLevel === 'high' || check.threatLevel === 'critical') {
+          summary.threats.high++;
+        } else if (check.threatLevel === 'medium') {
+          summary.threats.medium++;
+        } else if (check.threatLevel === 'low') {
+          summary.threats.low++;
+        }
+      }
+    } catch (e) {
+      // Skip errors
+    }
+  });
+
+  return summary;
+}

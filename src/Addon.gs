@@ -257,9 +257,67 @@ function buildHomepageCard() {
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
   );
 
+  // Bulk Actions section
+  const bulkSection = CardService.newCardSection()
+    .setHeader('Bulk Actions')
+    .setCollapsible(true);
+
+  // Scan inbox for threats
+  const scanInboxAction = CardService.newAction()
+    .setFunctionName('onBulkSecurityScan')
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  bulkSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Scan Inbox for Threats')
+      .setBottomLabel('Check recent emails for spam/phishing')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.STAR))
+      .setOnClickAction(scanInboxAction)
+  );
+
+  // Bulk archive old emails
+  const bulkArchiveAction = CardService.newAction()
+    .setFunctionName('onBulkArchiveOld')
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  bulkSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Archive Old Emails')
+      .setBottomLabel('Archive emails older than 30 days')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
+      .setOnClickAction(bulkArchiveAction)
+  );
+
+  // Mark all as read
+  const markAllReadAction = CardService.newAction()
+    .setFunctionName('onBulkMarkRead')
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  bulkSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Mark All as Read')
+      .setBottomLabel('Mark all inbox emails as read')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.EMAIL))
+      .setOnClickAction(markAllReadAction)
+  );
+
+  // View inbox summary
+  const inboxSummaryAction = CardService.newAction()
+    .setFunctionName('onShowInboxSummary')
+    .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+  bulkSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Inbox Summary')
+      .setBottomLabel('View inbox statistics')
+      .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.DESCRIPTION))
+      .setOnClickAction(inboxSummaryAction)
+  );
+
   card.addSection(welcomeSection);
   card.addSection(dashboardSection);
   card.addSection(featuresSection);
+  card.addSection(bulkSection);
   card.addSection(automationSection);
   card.addSection(statusSection);
 
@@ -3044,4 +3102,374 @@ function onMarkAsSafe(e) {
       .setNotification(CardService.newNotification().setText('Error: ' + error.message))
       .build();
   }
+}
+
+// ============================================================================
+// BULK ACTION HANDLERS
+// ============================================================================
+
+/**
+ * Bulk security scan handler
+ */
+function onBulkSecurityScan(e) {
+  try {
+    const results = batchSecurityScan(25);
+    const card = buildBulkScanResultsCard(results);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    logError('onBulkSecurityScan', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Build bulk scan results card
+ */
+function buildBulkScanResultsCard(results) {
+  const card = CardService.newCardBuilder();
+
+  card.setHeader(CardService.newCardHeader()
+    .setTitle('Security Scan Results')
+    .setSubtitle(results.scanned + ' emails scanned'));
+
+  // Summary section
+  const summarySection = CardService.newCardSection()
+    .setHeader('Summary');
+
+  summarySection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Scanned: ' + results.scanned)
+      .setWrapText(true)
+  );
+
+  summarySection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Safe: ' + results.safe)
+      .setWrapText(true)
+  );
+
+  summarySection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Threats Found: ' + results.threats.length)
+      .setWrapText(true)
+  );
+
+  if (results.errors > 0) {
+    summarySection.addWidget(
+      CardService.newDecoratedText()
+        .setText('Errors: ' + results.errors)
+        .setWrapText(true)
+    );
+  }
+
+  card.addSection(summarySection);
+
+  // Threats section
+  if (results.threats.length > 0) {
+    const threatsSection = CardService.newCardSection()
+      .setHeader('Threats Detected (' + results.threats.length + ')')
+      .setCollapsible(true);
+
+    results.threats.forEach(function(threat) {
+      const threatAction = CardService.newAction()
+        .setFunctionName('onViewThreatDetails')
+        .setParameters({
+          messageId: threat.messageId,
+          threatLevel: threat.threatLevel
+        });
+
+      threatsSection.addWidget(
+        CardService.newDecoratedText()
+          .setText(threat.subject.substring(0, 50) + (threat.subject.length > 50 ? '...' : ''))
+          .setBottomLabel(threat.threatLevel.toUpperCase() + ' - ' + threat.from.substring(0, 30))
+          .setWrapText(true)
+          .setOnClickAction(threatAction)
+      );
+    });
+
+    // Bulk action buttons
+    if (results.threats.length > 0) {
+      const archiveAllAction = CardService.newAction()
+        .setFunctionName('onBulkArchiveThreats')
+        .setParameters({ threats: JSON.stringify(results.threats) })
+        .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+      threatsSection.addWidget(
+        CardService.newTextButton()
+          .setText('Archive All Threats')
+          .setOnClickAction(archiveAllAction)
+          .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+      );
+
+      const spamAllAction = CardService.newAction()
+        .setFunctionName('onBulkSpamThreats')
+        .setParameters({ threats: JSON.stringify(results.threats) })
+        .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+      threatsSection.addWidget(
+        CardService.newTextButton()
+          .setText('Report All as Spam')
+          .setOnClickAction(spamAllAction)
+      );
+    }
+
+    card.addSection(threatsSection);
+  }
+
+  return card.build();
+}
+
+/**
+ * View threat details handler
+ */
+function onViewThreatDetails(e) {
+  const messageId = e.parameters.messageId;
+
+  try {
+    const message = GmailApp.getMessageById(messageId);
+    if (!message) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Message not found'))
+        .build();
+    }
+
+    const result = quickSecurityCheck(message);
+    const card = buildSecurityResultCard(result, message, 'quick');
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Bulk archive threats handler
+ */
+function onBulkArchiveThreats(e) {
+  try {
+    const threats = JSON.parse(e.parameters.threats);
+    const results = bulkArchiveThreats(threats);
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('Archived ' + results.archived + ' threats'))
+      .setNavigation(CardService.newNavigation().popToRoot())
+      .build();
+
+  } catch (error) {
+    logError('onBulkArchiveThreats', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Bulk spam threats handler
+ */
+function onBulkSpamThreats(e) {
+  try {
+    const threats = JSON.parse(e.parameters.threats);
+    const messageIds = threats.map(function(t) { return t.messageId; });
+    const results = bulkReportSpam(messageIds);
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('Reported ' + results.reported + ' emails as spam'))
+      .setNavigation(CardService.newNavigation().popToRoot())
+      .build();
+
+  } catch (error) {
+    logError('onBulkSpamThreats', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Bulk archive old emails handler
+ */
+function onBulkArchiveOld(e) {
+  try {
+    // Get threads older than 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const query = 'in:inbox before:' + Utilities.formatDate(thirtyDaysAgo, Session.getScriptTimeZone(), 'yyyy/MM/dd');
+
+    const threads = GmailApp.search(query, 0, 50);
+    let archived = 0;
+
+    threads.forEach(function(thread) {
+      try {
+        thread.moveToArchive();
+        archived++;
+      } catch (e) {}
+    });
+
+    trackFeatureUsage('bulk_archive_old');
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('Archived ' + archived + ' old emails'))
+      .build();
+
+  } catch (error) {
+    logError('onBulkArchiveOld', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Bulk mark as read handler
+ */
+function onBulkMarkRead(e) {
+  try {
+    const threads = GmailApp.getInboxThreads(0, 100);
+    let marked = 0;
+
+    threads.forEach(function(thread) {
+      try {
+        if (thread.isUnread()) {
+          thread.markRead();
+          marked++;
+        }
+      } catch (e) {}
+    });
+
+    trackFeatureUsage('bulk_mark_read');
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('Marked ' + marked + ' emails as read'))
+      .build();
+
+  } catch (error) {
+    logError('onBulkMarkRead', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Show inbox summary handler
+ */
+function onShowInboxSummary(e) {
+  try {
+    const summary = getInboxSummary(50);
+    const card = buildInboxSummaryCard(summary);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(card))
+      .build();
+
+  } catch (error) {
+    logError('onShowInboxSummary', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Error: ' + error.message))
+      .build();
+  }
+}
+
+/**
+ * Build inbox summary card
+ */
+function buildInboxSummaryCard(summary) {
+  const card = CardService.newCardBuilder();
+
+  card.setHeader(CardService.newCardHeader()
+    .setTitle('Inbox Summary')
+    .setSubtitle(summary.total + ' emails analyzed'));
+
+  // Overview section
+  const overviewSection = CardService.newCardSection()
+    .setHeader('Overview');
+
+  overviewSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Total in Inbox: ' + summary.total)
+  );
+
+  overviewSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Unread: ' + summary.unread)
+  );
+
+  if (summary.oldestDate) {
+    overviewSection.addWidget(
+      CardService.newDecoratedText()
+        .setText('Oldest: ' + Utilities.formatDate(summary.oldestDate, Session.getScriptTimeZone(), 'MMM d, yyyy'))
+    );
+  }
+
+  card.addSection(overviewSection);
+
+  // Threats section
+  const threatsSection = CardService.newCardSection()
+    .setHeader('Security Threats');
+
+  threatsSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('High Risk: ' + summary.threats.high)
+      .setBottomLabel(summary.threats.high > 0 ? 'Action recommended' : 'None found')
+  );
+
+  threatsSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Medium Risk: ' + summary.threats.medium)
+  );
+
+  threatsSection.addWidget(
+    CardService.newDecoratedText()
+      .setText('Low Risk: ' + summary.threats.low)
+  );
+
+  card.addSection(threatsSection);
+
+  // Quick actions
+  const actionsSection = CardService.newCardSection()
+    .setHeader('Quick Actions');
+
+  if (summary.threats.high > 0 || summary.threats.medium > 0) {
+    const scanAction = CardService.newAction()
+      .setFunctionName('onBulkSecurityScan')
+      .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+    actionsSection.addWidget(
+      CardService.newTextButton()
+        .setText('View Threat Details')
+        .setOnClickAction(scanAction)
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    );
+  }
+
+  if (summary.unread > 10) {
+    const markReadAction = CardService.newAction()
+      .setFunctionName('onBulkMarkRead')
+      .setLoadIndicator(CardService.LoadIndicator.SPINNER);
+
+    actionsSection.addWidget(
+      CardService.newTextButton()
+        .setText('Mark All as Read')
+        .setOnClickAction(markReadAction)
+    );
+  }
+
+  card.addSection(actionsSection);
+
+  return card.build();
 }
