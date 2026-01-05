@@ -174,7 +174,7 @@ function autoLabelUnreadEmails() {
 }
 
 /**
- * Set up auto-labeling trigger (runs every 30 minutes)
+ * Set up auto-labeling trigger (runs every hour)
  */
 function setupAutoLabelTrigger() {
   // Remove existing triggers
@@ -185,13 +185,13 @@ function setupAutoLabelTrigger() {
     }
   });
 
-  // Create new trigger
+  // Create new trigger (minimum 1 hour for add-ons)
   ScriptApp.newTrigger('autoLabelUnreadEmails')
     .timeBased()
-    .everyMinutes(30)
+    .everyHours(1)
     .create();
 
-  Logger.log('Auto-label trigger set up for every 30 minutes');
+  Logger.log('Auto-label trigger set up for every hour');
 }
 
 /**

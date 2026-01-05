@@ -146,7 +146,7 @@ function buildHomepageCard() {
   automationSection.addWidget(
     CardService.newDecoratedText()
       .setText('Auto-Label Emails')
-      .setBottomLabel('Smart categorization every 30 min')
+      .setBottomLabel('Smart categorization every hour')
       .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.BOOKMARK))
       .setSwitchControl(
         CardService.newSwitch()
@@ -613,11 +613,12 @@ function buildDraftResultCard(replyText, draftId, messageId) {
   );
 
   // Draft preview section
+  const previewText = replyText ? truncateText(replyText, 500) : 'Draft generated successfully.';
   const previewSection = CardService.newCardSection()
     .setHeader('Preview')
     .addWidget(
       CardService.newTextParagraph()
-        .setText(truncateText(replyText, 500))
+        .setText(previewText)
     );
 
   card.addSection(previewSection);
@@ -625,16 +626,14 @@ function buildDraftResultCard(replyText, draftId, messageId) {
   // Success message
   const statusSection = CardService.newCardSection()
     .addWidget(
-      CardService.newDecoratedText()
-        .setText('Draft saved successfully')
-        .setBottomLabel('Check your Drafts folder to review and send')
-        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CONFIRM))
+      CardService.newTextParagraph()
+        .setText('✅ Draft saved successfully. Check your Drafts folder to review and send.')
     );
 
   // Regenerate option
   const regenerateAction = CardService.newAction()
     .setFunctionName('onDraftReplyStart')
-    .setParameters({ messageId: messageId });
+    .setParameters({ messageId: messageId || '' });
 
   statusSection.addWidget(
     CardService.newTextButton()
