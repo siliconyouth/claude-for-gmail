@@ -3,6 +3,9 @@
  * Provides card-based interface for Claude AI email assistance
  */
 
+// Logo URL for card headers
+const LOGO_URL = 'https://raw.githubusercontent.com/siliconyouth/claude-for-gmail/main/assets/logo.png';
+
 // ============================================================================
 // TRIGGER HANDLERS
 // ============================================================================
@@ -58,7 +61,7 @@ function buildHomepageCard() {
       .setTitle('Claude for Gmail')
       .setSubtitle('AI-powered email assistance')
       .setImageStyle(CardService.ImageStyle.CIRCLE)
-      .setImageUrl('https://www.gstatic.com/images/branding/product/2x/google_cloud_48dp.png')
+      .setImageUrl(LOGO_URL)
   );
 
   // Welcome section
@@ -205,6 +208,8 @@ function buildEmailActionCard(messageId) {
     CardService.newCardHeader()
       .setTitle('Claude for Gmail')
       .setSubtitle('Click an action below')
+      .setImageStyle(CardService.ImageStyle.CIRCLE)
+      .setImageUrl(LOGO_URL)
   );
 
   // Quick actions section
@@ -310,6 +315,8 @@ function buildComposeCard() {
     CardService.newCardHeader()
       .setTitle('Draft with Claude')
       .setSubtitle('AI writing assistance')
+      .setImageStyle(CardService.ImageStyle.CIRCLE)
+      .setImageUrl(LOGO_URL)
   );
 
   const section = CardService.newCardSection()
@@ -1158,6 +1165,8 @@ function buildSettingsCard() {
     CardService.newCardHeader()
       .setTitle('Settings')
       .setSubtitle('Customize your experience')
+      .setImageStyle(CardService.ImageStyle.CIRCLE)
+      .setImageUrl(LOGO_URL)
   );
 
   // Reply settings section
